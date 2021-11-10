@@ -1,0 +1,23 @@
+{
+				"manifest_version": 2,
+				"name": "Speeder",
+				"version": "1.0",
+				"description": "Speeds up Youtube videos past 2x, below 0.25x",
+
+				"icons": {
+								"48": "icons/clock48.png",
+								"96": "icons/clock96.png"
+				},
+
+				"permissions": [
+					"activeTab",
+					"tabs"
+				],
+
+
+				"browser_action": {
+					"default_icon": "icons/clock19.png",
+					"default_title": "Speeder",
+					"default_popup": "popup/choose_speed.html"
+				}
+}

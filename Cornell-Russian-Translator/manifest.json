@@ -1,0 +1,19 @@
+{
+				"manifest_version": 2,
+				"name": "Cornell Russian Translator",
+				"version": "1.0",
+				"description": "Useful for the one specific website 'http://russian.cornell.edu/grammar/subject.htm' which for some reason uses a bunch of non-Russian Cyrillic letters, this changes them to their Russian equivalents",
+
+				"icons": {
+								"48": "icons/stone-48.jpeg",
+								"96": "icons/stone-96.jpeg"
+				},
+
+	"content_scripts": [
+					{
+									"matches": ["*://russian.cornell.edu/grammar/*"],
+									"js": ["translate.js"]
+					}
+	]
+
+}

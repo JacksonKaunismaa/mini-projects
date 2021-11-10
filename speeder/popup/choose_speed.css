@@ -1,0 +1,21 @@
+#speed-input {
+	text-align: center;
+}
+#speed, #submit {
+	display: inline-flex;
+}
+
+#submit {
+	overflow: hidden;
+	padding: 0 5px 0 5px;
+	border: 1px solid black;
+	border-radius: 4px;
+	margin: 0 5px 0 5px;
+}
+
+#submit:hover {
+	user-select: none;
+	-moz-user-select: none;
+	background-color: #d3d3d3;
+	cursor: default;
+}

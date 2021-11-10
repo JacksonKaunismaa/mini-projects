@@ -1,0 +1,30 @@
+
+{
+	"manifest_version": 2,
+	"name": "No Page Visibility",
+	"version": "1.0",
+	"description": "Disables javascript Page Visibility API",
+	
+	"icons": {
+		"48": "icons/eyes-watch-48.jpeg",
+		"64": "icons/eyes-watch-64.jpeg"
+	},
+
+	"browser_action": {
+		"default_icon": {
+			"16": "icons/eyes-watch-48.jpeg",
+			"32": "icons/eyes-watch-32.jpeg",
+			"48": "icons/eyes-watch-48.jpeg",
+			"64": "icons/eyes-watch-64.jpeg"
+		},
+		"default_title": "Disable Page Visibility API"
+	},
+
+	"background": {
+		"scripts": ["background.js"]
+	},
+
+
+	"permissions": ["activeTab", "tabs"]	
+}
+
