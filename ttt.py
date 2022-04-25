@@ -87,6 +87,31 @@ class TicTacToe(object):
             return 1e-8
         return 0
 
+def test():
+    times = 0
+    wins = 0
+    N = 10000
+    import time
+    from tqdm import tqdm
+    for _ in tqdm(range(N)):
+        board = TicTacToe()
+        start = time.perf_counter()
+        while True:
+            mv = np.random.randint(0,9)
+            if mv in board.get_legal():
+                board.move(mv)
+            win_val = board.win_check(mv)
+            if win_val > 0.5:
+                #print(board, "win")
+                wins += 1
+                break
+            if win_val:
+                #print(board, "drow")
+                break
+        times += time.perf_counter() - start
+    print("avg time:", times/N)
+    print("avg wins:", wins/N)
+
 def main():
     game = TicTacToe()
     agent = ql.QLearn(20.0, 9)
@@ -132,4 +157,5 @@ def main():
     print("Wow you're ok!")
 
 if __name__ == "__main__":
-    main()
+    test()
+    #main()

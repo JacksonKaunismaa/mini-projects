@@ -18,9 +18,11 @@ GRAY = "#a7aaaa"
 BLUE = "#0d99bc"
 DELAY = 0.05
 PRESS_TIME = 0.021
+IGT_DELAY = 5.0
 
 kctl = keyboard.Controller()
-minecraft_stats = "/home/test/.minecraft/spedrun-worlds/saves/*/stats/*.json"
+#minecraft_stats = "/home/test/.minecraft/spedrun-worlds/saves/*/stats/*.json"
+minecraft_stats = "/home/test/E_Drive/Garbage/multimc/install/bin/instances/1.16.1/.minecraft/saves/*/stats/*.json"
 
 class Window(QWidget):
     def __init__(self):
@@ -60,6 +62,7 @@ class Window(QWidget):
         self.time_thread = th.Thread(target=self.updater, daemon=True)
         self.time_thread.start()
 
+        self.most_recent = ""
         self.igt_thread = th.Thread(target=self.igt_getter, daemon=True)
         self.igt_thread.start()
         self.last_igts = {}
@@ -81,15 +84,19 @@ class Window(QWidget):
 
     def igt_getter(self):
         while not self.done:
-            time.sleep(1.0)
+            time.sleep(IGT_DELAY)
             all_stats = glob.glob(minecraft_stats)
+            if self.most_recent:
+                all_stats.insert(0, self.most_recent) # check the most recently changed one more frequently
             for fname in all_stats:
                 curr_igt = get_igt(fname)
                 try:
-                    if self.last_igts[fname] != curr_igt:
+                    if self.last_igts[fname] != curr_igt and curr_igt:
                         self.world_name = fname
                         self.last_igts[fname] = curr_igt
                         self.igt_update(curr_igt)
+                        self.most_recent = fname
+                        break
                 except KeyError:
                     self.last_igts[fname] = curr_igt
 
@@ -189,28 +196,43 @@ screen.show()
 
 
 def on_enter():
-    screen.pause_unpause()
+    if not lock.is_set():
+        screen.pause_unpause()
+        reset_allowed.set()
 
 def on_bslash():
     screen.reset_timer()
 
-def tap(key, amount=1):
+def tap(key, amount=1, mod=None):
+    if mod:
+        kctl.press(mod)
+        time.sleep(PRESS_TIME)
     for _ in range(amount):
         kctl.press(key)
         time.sleep(PRESS_TIME)
         kctl.release(key)
         time.sleep(DELAY)
+    if mod:
+        kctl.release(mod)
 
 def create_world():
-    tap(keyboard.Key.esc, 3)
-    tap(keyboard.Key.tab)
-    tap(keyboard.Key.enter)
-    tap(keyboard.Key.tab, 3)
-    tap(keyboard.Key.enter)
-    tap(keyboard.Key.tab, 2)
-    tap(keyboard.Key.enter, 3)
-    tap(keyboard.Key.tab, 5)
-    tap(keyboard.Key.enter)
+    #tap(keyboard.Key.esc, 3)
+    #tap(keyboard.Key.tab)
+    #tap(keyboard.Key.enter)
+    #tap(keyboard.Key.tab, 3)
+    #tap(keyboard.Key.enter)
+    #tap(keyboard.Key.tab, 2)
+    #tap(keyboard.Key.enter, 3)
+    #tap(keyboard.Key.tab, 5)
+    #tap(keyboard.Key.enter)
+    if reset_allowed.is_set():
+        lock.set()
+        tap(keyboard.Key.esc)
+        tap(keyboard.Key.tab, mod=keyboard.Key.shift)
+        tap(keyboard.Key.enter)
+        lock.clear()
+        on_bslash()
+        reset_allowed.clear()
 
 
 def get_igt(filename):
@@ -221,11 +243,12 @@ def get_igt(filename):
     except:
         return None
 
-
+lock = th.Event()
+reset_allowed = th.Event()
 h =  keyboard.GlobalHotKeys({
     "<ctrl>+<alt>+<enter>": on_enter,
     "<ctrl>+<alt>+<backspace>": on_bslash,
-    "<ctrl>+y": create_world})
+    "<ctrl>+<alt>+y": create_world})
 h.start()
 try:
     app.exec_()     # not the best practice
