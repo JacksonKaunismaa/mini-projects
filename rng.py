@@ -33,6 +33,8 @@ class RNG():
         self.hits = 0
 
     def __repr__(self):
+        if not hasattr(self, "data"):
+            self.generate()
         return f"{self.data}, {self.i}, {self.hits}, {self.hit_freq}"
 
     def next(self):
