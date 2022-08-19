@@ -149,20 +149,24 @@ def jsd(d1, d2):
 def naive_comparison(runs, iters=100_000):
     import time
     from collections import Counter
+    import tqdm
     rng = RNG(np.random.choice, (5,2), [49, 50, 8512, 20], p=[0.2, 0.3, 0.1, 0.4])
     counts_naive = Counter()
     start = time.perf_counter()
-    for _ in range(runs):
+    for _ in tqdm.tqdm(range(runs)):
         for _ in range(iters):
             counts_naive += Counter(np.random.choice([49, 50, 8512, 20], size=(5,2), p=[0.2, 0.3, 0.1, 0.4]).flatten())
-    print("Naive avg:", (time.perf_counter() - start)/runs)
+    naive_avg = (time.perf_counter() - start)/runs
+    print("Naive avg:", naive_avg)
     counts_rng = Counter()
     start = time.perf_counter()
-    for _ in range(runs):
+    for _ in tqdm.tqdm(range(runs)):
         for _ in range(iters):
             counts_rng += Counter(rng.next().flatten())
-    print("RNG avg:  ", (time.perf_counter() - start)/runs)
-    print("diff:", jsd(counts_rng, counts_naive))  # disable this if distrubitions are continuous
+    rng_avg = (time.perf_counter() - start)/runs
+    print("RNG avg:  ", rng_avg)
+    print("JSD between naive and rng:", jsd(counts_rng, counts_naive))  # disable this if distrubitions are continuous
+    print(f"RNG is {naive_avg/rng_avg:.2f}x times faster than naive")
 
 if __name__ == "__main__":
     #optimize(1000)
