@@ -1,13 +1,12 @@
 import itertools
-from groups import *
-from operations import *
+from . import groups
 
 class Permutation():
     def __init__(self, cycle_notation=None, result_notation=None, n=None):
         assert (cycle_notation is None) ^ (result_notation is None)
         notation = cycle_notation if cycle_notation is not None else result_notation
 
-        #print(cycle_notation, result_notation, notation)
+        #print(cycle_notation,result_notation, notation)
 
         self.n = n
         if cycle_notation is not None:
@@ -135,30 +134,7 @@ class Permutation():
 
 
 def get_all_permutations(n):
-    return Coset(*list(Permutation(result_notation=pt) for pt in itertools.permutations(list(range(n)))))
+    return groups.Group(*list(Permutation(result_notation=pt) for pt in itertools.permutations(list(range(n)))))
 
 def get_even_permutations(n):
-    return Coset(*list(filter(lambda x: x.parity == 0, get_all_permutations(n))))
-
-
-def main():
-    # some very simple tets
-    fours = get_all_permutations(4)
-    a4 = generate([Permutation([[0,1,2]], n=4),
-                Permutation([[1,2,3]], n=4),
-                ])
-    s4 = get_all_permutations(4)
-    for perm in s4:
-        print(perm, perm.cycle_type, perm.parity)
-        if perm.parity == 0:
-            assert perm in a4
-    for perm in a4:
-        assert perm.parity == 0
-    print("##"*20)
-    for perm in fours:
-        print(perm, perm.cycle_type)
-    print("##"*20)
-
-
-if __name__ == "__main__":
-    main()
+    return groups.Group(*list(filter(lambda x: x.parity == 0, get_all_permutations(n))))

@@ -1,6 +1,7 @@
 from collections import defaultdict, deque
 from typing import Union
 from itertools import islice, repeat
+from . import operations
 
 
 def sliding_window(iterable, n):  # standard itertools recipe
@@ -288,28 +289,44 @@ class Expression():
         return hash(str(self))
 
 
-class Group():  # better for the "symbolic" groups with few symbols, like dihedral, abelian, semi-abelian, semi-dehidral, dicyclic
-    def __init__(self, rules, verbose=False):
+class Group(set):  # includes both the elements of the Group and the rules of the representation
+    def __init__(self, *elems, rules=None, generate=False, verbose=False):
+        super().__init__(elems)
         self.singleton_rules = {}
         self.general_rules = defaultdict(list)
-
-        for rule in rules:
-            pattern, result = rule.split("=")
-            pattern_expr = self.parse(pattern)
-            result_expr = self.parse(result)
-            
-            if len(pattern_expr) == 1 and  result_expr.is_identity:  # if symbol is cyclic, do this for efficiency
-                self.singleton_rules[pattern_expr[0].sym] = pattern_expr[0].exp
-                continue
-            self.general_rules[len(pattern_expr)].append((pattern_expr, result_expr))    # map symbol -> (exponent, replacement)
-        # print(self.general_rules)
-        # print(self.singleton_rules)
+        self.symbols = set()
         self.verbose = verbose
+
+        if rules:
+            for rule in rules:
+                pattern, result = rule.split("=")
+                pattern_expr = self.parse(pattern)
+                result_expr = self.parse(result)
+                
+                self._add_syms(pattern_expr, result_expr)  # so that we can generate the group later
+
+                if len(pattern_expr) == 1 and  result_expr.is_identity:  # if symbol is cyclic, do this for efficiency
+                    self.singleton_rules[pattern_expr[0].sym] = pattern_expr[0].exp
+                    continue
+                self.general_rules[len(pattern_expr)].append((pattern_expr, result_expr))    # map symbol -> (exponent, replacement)
+        
+        if generate:  # should probably only use this for finite groups
+            self._generate()  # can't really handle infinite groups yet
+
+    def _generate(self):  # generate all elements in the group
+        elems = operations.generate([self.parse(sym) for sym in self.symbols])
+        self |= elems
         
     def identity(self): # helper function to return an identity element
         return Term(None, None, self)
+    
+    def _add_syms(self, *exprs):
+        for expr in exprs:
+            for term in expr:
+                if not term.is_identity:
+                    self.symbols.add(term.sym)
 
-    def parse(self, equation) -> "Expression":
+    def parse(self, equation) -> "Expression":  # turn a written string into an Expression
         terms = equation.strip().split()
         start = self.identity()
         for t in terms:
@@ -320,28 +337,21 @@ class Group():  # better for the "symbolic" groups with few symbols, like dihedr
             else:
                 next_term = Term(t[0], int(t[1:]), self)
             start = start._mul(next_term)
-        if isinstance(start, Term):  # always return an Expression
+        if isinstance(start, Term):  # always return an Expression 
             return Expression([start], self)
         return start
-    
 
-class Coset(set):  # not the best name, really refers to any collection of group elements
-    def __init__(self, *elems):
-        super().__init__(elems)
-
-    def __mul__(self, other):  # ie Coset * Term (right cosets)
-        new_elems = Coset()
+    def __mul__(self, other):  # ie Group * Term (right cosets)
+        new_elems = Group()
         for elem in self:
             new_elems.add(elem * other)
         return new_elems
     
-    def __rmul__(self, other): # ie. Term * Coset (left cosets)
-        new_elems = Coset()
+    def __rmul__(self, other): # ie. Term * Group (left cosets)
+        new_elems = Group()
         for elem in self:
             new_elems.add(other * elem)
         return new_elems
     
-    def __truediv__(self, other): # ie. Coset / {Term, Permutation}
+    def __truediv__(self, other): # ie. Group / {Term, Permutation}
         return self*other.inv()
-
-
