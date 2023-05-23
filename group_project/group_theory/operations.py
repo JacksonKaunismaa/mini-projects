@@ -1,4 +1,6 @@
 from collections.abc import Iterable
+from collections import Counter
+import itertools
 from . import permutation
 from . import groups
 
@@ -28,6 +30,46 @@ def simpler_heuristic(term1, term2):
     return False
 
 
+def factorize(n):  # from https://codereview.stackexchange.com/questions/121862/fast-number-factorization-in-python
+    for fact in itertools.chain([2], itertools.count(3,2)):
+        if n == 1:
+            break
+        while n % fact == 0:
+            n //= fact
+            yield fact
+
+
+def get_interesting_sizes(n):
+    # return a list of exponents that would generate a different subgroup from a single element of order n
+    factors = list(Counter(factorize(n)).items())  # so that order is fixed
+    yield 0  # give the option to not use this particular element
+    for exponents in  itertools.product(*(range(sz) for _,sz in factors)):
+        elem = 1
+        for (fact,_), amt in zip(factors, exponents):
+            elem *= fact**amt
+        yield elem
+
+
+def find_subgroups(group):  # only works for finite groups
+    if isinstance(group, groups.Group):
+        generators = group.singleton_rules  # generators should be a dict of symbol: orbit_of_symbol
+    else:
+        generators = {permutation.Permutation([[a, b]], n=group.n): 2  # generate group via adjacent transpositions 
+                                    for a,b in zip(range(0,group.n-1), range(1,group.n))}
+    generators = list(generators.items())  # so that order is fixed
+    subgroups = {}
+    # iterate over all possible exponents for all possible generators
+    for amts in itertools.product(*(get_interesting_sizes(order) for _,order in generators)): 
+        # generate a new subgroup using the given exponents, ignoring a generator if its exponent is 0
+        subgroup_generators = [group.parse(f"{elem}{amt}") for (elem,_),amt in zip(generators, amts) if amt != 0]
+        new_subgroup = group.generate(*subgroup_generators)
+        print(new_subgroup, amts, type(new_subgroup))
+
+        if new_subgroup and new_subgroup not in subgroups.values():  # only add unique subgroups
+            subgroups[tuple(subgroup_generators)] = new_subgroup
+    return subgroups
+
+
 def conjugacy_class(elem, all_elems):
     reachable = []
     generators = []  # the associated list of elements that generate each coset/element in "reachable"
@@ -45,7 +87,7 @@ def conjugacy_class(elem, all_elems):
 
 
 def orbit(base_elem):
-    reachable = groups.Group()
+    reachable = base_elem.group.subgroup()
     elem = base_elem
     reachable.add(elem)
     while not elem.is_identity:
@@ -54,27 +96,10 @@ def orbit(base_elem):
     return reachable
 
 
-def generate(*elems) -> groups.Group:
-    if isinstance(elems[0], list):
-        elems = elems[0]
-    frontier = groups.Group(*elems)  # should retain the rules?
-    visited = groups.Group()
-    while len(frontier) > 0:  # BFS
-        start = frontier.pop()
-        #print("checking elem", start)
-        for elem in elems:
-            next = start*elem
-            if next not in visited:
-                #print("found new node", next)
-                frontier.add(next)
-                visited.add(next)
-                #yield next  # so that we can do infinite groups as well
-    return visited
-
 def centralizer(elems, all_elems):
     if not isinstance(elems, Iterable):
         elems = [elems]
-    commuters = groups.Group()
+    commuters = all_elems.subgroup()
     for candidate in all_elems:
         for pt in elems:
             if pt*candidate != candidate*pt:
@@ -87,9 +112,9 @@ def centralizer(elems, all_elems):
 
 def normalizer(elems, all_elems):
     if not isinstance(elems, Iterable):
-        elems = generate(elems)
+        elems = all_elems.generate(elems)
     #all_perms = #get_all_permutations(max(elems, key=lambda x: x.n).n)
-    commuters = groups.Group()
+    commuters = all_elems.subgroup()
     for candidate in all_elems:
         for elem in elems:
             if candidate*elem/candidate not in elems:
@@ -97,12 +122,11 @@ def normalizer(elems, all_elems):
         else:
             commuters.add(candidate)
     return commuters
-
+    
 
 def find_cosets(coset: groups.Group, full_group: groups.Group, left=True) -> list[groups.Group]:
-    arbitrary_elem = next(iter(coset))
-    cosets = {arbitrary_elem.identity():  coset}
-    full_group = full_group - coset
+    cosets = {}
+    full_group = full_group.copy()
     while len(full_group) > 0:
         elem = full_group.pop()
         new_coset = elem * coset
@@ -138,6 +162,9 @@ def center(all_elems):
 
 
 def default_groups(group_name, n):      # some definitions for common finite groups
+    if group_name == "quaternion":
+        group_name = "dicyclic"
+        n //= 2
     rules_d =  dict(cyclic=[f"r{n} = e"],
                     dihedral=[f"r{n} = e",
                               f"f2 = e",
@@ -154,7 +181,7 @@ def default_groups(group_name, n):      # some definitions for common finite gro
                                   f"s r = r{n//2+1} s"],
                     abelian=[f"r{n} = e",
                              f"s2 = e",
-                             f"s r = r s"]
+                             f"s r = r s"],
                     )
     if group_name in ["dicyclic", "semi_dihedral", "semi_abelian"] and n % 2 != 0:
         assert f"n must be divisible by 2 for {group_name} group, it was {n} instead"
@@ -170,7 +197,8 @@ def get_group(query):  # would use this in a "interactive" session, but probably
                 (["dic", "dicyclic"], "dicylic"),
                 (["semi-dihedral", "sd", "semi_dihedral"], "semi_dihedral"),
                 (["semi-abelian", "sa", "semi_abelian"], "semi_abelian"),
-                (["abelian", "a", "ab"], "abelian")]
+                (["abelian", "a", "ab"], "abelian"),
+                (["quaternion", "quat", "q"], "quaternion")]
     group_name = extracted.group(1).strip()
     for (alt_names, name) in mappings:
         if group_name in alt_names:

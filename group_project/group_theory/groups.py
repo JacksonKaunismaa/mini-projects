@@ -2,7 +2,7 @@ from collections import defaultdict, deque
 from typing import Union
 from itertools import islice, repeat
 from . import operations
-
+from . import permutation
 
 def sliding_window(iterable, n):  # standard itertools recipe
     it = iter(iterable)
@@ -110,7 +110,7 @@ class Expression():
         self.group = group
         self.expr = expr
         if not self.expr:
-            self.expr = [group.identity()]  # allowing empty expresions makes things buggy
+            self.expr = [group._identity_term()]  # allowing empty expresions makes things buggy
 
 
     def windows_match(self, window, pattern):
@@ -125,7 +125,7 @@ class Expression():
         if self.group.verbose:
             print(*args, **kwargs)
 
-    def simplify(self, max_iters=50) -> "Expression":
+    def simplify(self, max_iters=100) -> "Expression":
         updated = True  # if we've applied a rule or not in the given iteration
         n = 0  # check total iterations so far
         self.tprint("doing the printing?")
@@ -139,7 +139,7 @@ class Expression():
             for window_size in sorted(self.group.general_rules.keys(), reverse=True):  # check all possible window-sizes we have rules for
                 if len(self) < window_size:
                     continue
-                new_expr = Expression([], self.group)  # could be Expression([], self.group) as well
+                new_expr = self.group._identity_expr()
 
                 window_iter = sliding_window(self.expr, window_size)  # current window we are looking to apply rules in
                 last_posn = 0  # track where we've appended up to, so we can append missing ones at the end
@@ -154,10 +154,8 @@ class Expression():
                             # the result of applying the rule.
                             # filter identity to save a bit of compute (calculating translation doesn't filter for it
                             # ie. window[0]/pattern[0] * result * window[-1]/pattern[-1]
-                            if window_size > 1:
-                                translation = result._concat([window[0]._truediv(pattern[0])], [window[-1]._truediv(pattern[-1])])
-                            else:
-                                translation = window[0]._truediv(pattern[0])
+                            translation = result._concat([window[0]._truediv(pattern[0])], [window[-1]._truediv(pattern[-1])])
+                            
                             self.tprint("\t\twill be adding", translation)
 
                             new_expr = new_expr._mul(translation)
@@ -189,7 +187,7 @@ class Expression():
         return self
 
     def _combine_like_terms(self, n: int) -> "Expression":
-        curr_term = self.identity()
+        curr_term = self.group._identity_term()
         for i, (term1, term2) in enumerate(zip(self.expr[n-1::-1], self.expr[n:])):
             #print("looking at", term1, curr_term, term2)
             curr_term = term1._mul(curr_term) #  * term2
@@ -218,9 +216,6 @@ class Expression():
     @property
     def is_identity(self):
         return all([x.is_identity for x in self.expr])
-    
-    def identity(self):
-        return self.group.identity()
 
     def __getitem__(self, idx) -> Term:
         return self.expr[idx]
@@ -280,7 +275,11 @@ class Expression():
         return Expression(list(repeat(self.expr, other)), self.group)
 
     def __eq__(self, other):  # need to check len because zip truncates elements
-        return len(self) == len(other) and all(t1 == t2 for t1,t2 in zip(self.expr, other.expr))
+        try:
+            return len(self) == len(other) and all(t1 == t2 for t1,t2 in zip(self.expr, other.expr))
+        except TypeError:
+            print(self, type(self), "######", other, type(other))
+            raise
 
     def __repr__(self):
         return " ".join([str(t) for t in self.expr])
@@ -311,14 +310,60 @@ class Group(set):  # includes both the elements of the Group and the rules of th
                 self.general_rules[len(pattern_expr)].append((pattern_expr, result_expr))    # map symbol -> (exponent, replacement)
         
         if generate:  # should probably only use this for finite groups
-            self._generate()  # can't really handle infinite groups yet
+            self._generate_all()  # can't really handle infinite groups yet
 
-    def _generate(self):  # generate all elements in the group
-        elems = operations.generate([self.parse(sym) for sym in self.symbols])
+        if elems and isinstance(elems[0], permutation.Permutation):
+            self.n = elems[0].n
+
+    def _generate_all(self):  # generate all elements in the group
+        elems = self.generate(*self.symbols)
         self |= elems
+
+    def generate(self, *exprs) -> "Group":
+        if len(exprs) == 0:
+            return self._identity_group()
+    
+        if isinstance(exprs[0], str):
+            exprs = [self.parse(expr) for expr in exprs]
+
+        frontier = self.subgroup(*exprs)
+        visited = self.subgroup()
+        while len(frontier) > 0:  # BFS
+            start = frontier.pop()
+            print("checking elem", start)
+            for elem in exprs:
+                next = start*elem
+                if next not in visited:
+                    print("found new node", next)
+                    frontier.add(next)
+                    visited.add(next)
+                    #yield next  # so that we can do infinite groups as well
+        return visited
+    
+    @property
+    def is_perm_group(self):
+        return hasattr(self, "n")  # permutation groups have n defined, others don't
         
-    def identity(self): # helper function to return an identity element
-        return Term(None, None, self)
+    def _identity_term(self): # helper function to return an identity element, should only be called internally
+        return Term(None, None, self)  # clients only use is_identity, and is_identity needs to be implemented everywhere
+    
+    def _identity_expr(self):  # helper function to return an expr, pretty much only used in generate
+        if self.is_perm_group:
+            return permutation.Permutation(None, n=self.n)
+        else:
+            return Expression([self._identity_term()], self)
+    
+    def _identity_group(self):   # helper function return a Group containing only an identity {Expression, Permutation}
+        expr = self._identity_expr()
+        return self.subgroup(expr)
+    
+    def subgroup(self, *elems):  # create an empty subgroup that has the same multiplication rules
+        group = Group(*elems)
+        set_these = ["singleton_rules", "general_rules", "n", "symbols", "verbose"]
+        for var_name in set_these:
+            if hasattr(self, var_name):
+                setattr(group, var_name, getattr(self, var_name))
+        return group
     
     def _add_syms(self, *exprs):
         for expr in exprs:
@@ -328,10 +373,10 @@ class Group(set):  # includes both the elements of the Group and the rules of th
 
     def parse(self, equation) -> "Expression":  # turn a written string into an Expression
         terms = equation.strip().split()
-        start = self.identity()
+        start = self._identity_term()
         for t in terms:
             if t[0] in IDENTITY_SYMBOLS:
-                next_term = self.identity()
+                next_term = self._identity_term()
             elif len(t) == 1:
                 next_term = Term(t[0], 1, self)  # 1 is default exponent
             else:
@@ -340,15 +385,25 @@ class Group(set):  # includes both the elements of the Group and the rules of th
         if isinstance(start, Term):  # always return an Expression 
             return Expression([start], self)
         return start
+    
+    def evaluate(self, equation):
+        return self.parse(equation).simplify()
+
+    def copy(self):
+        return self.subgroup(*self)
 
     def __mul__(self, other):  # ie Group * Term (right cosets)
-        new_elems = Group()
+        new_elems = self.subgroup()
         for elem in self:
             new_elems.add(elem * other)
         return new_elems
     
     def __rmul__(self, other): # ie. Term * Group (left cosets)
-        new_elems = Group()
+        try:
+            new_elems = self.subgroup()
+        except AttributeError:
+            print(type(self), type(other))
+            raise
         for elem in self:
             new_elems.add(other * elem)
         return new_elems

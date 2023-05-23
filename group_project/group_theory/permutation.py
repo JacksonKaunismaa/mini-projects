@@ -1,6 +1,8 @@
 import itertools
 from . import groups
 
+# a Permutation should essentially be equivalent to an Expression (though in some sense it also only ever has a single Term)
+
 class Permutation():
     def __init__(self, cycle_notation=None, result_notation=None, n=None):
         assert (cycle_notation is None) ^ (result_notation is None)
@@ -47,9 +49,11 @@ class Permutation():
     def is_identity(self):
         return not self.cycle
     
-
-    def identity(self):
-        return Permutation([], n=self.n)
+    @property
+    def group(self):
+        group = groups.Group()  # no rules to derive, so just create an empty one
+        group.n = self.n  # => calling .group.subgroup() is redundant on a Permutation, but it keeps the same API
+        return group   # so its fine
 
     @property
     def cycle_type(self):
@@ -133,6 +137,7 @@ class Permutation():
         return str(self) == str(other)
 
 
+# the one instance where we don't use the .subgroup() interface to create a new group
 def get_all_permutations(n):
     return groups.Group(*list(Permutation(result_notation=pt) for pt in itertools.permutations(list(range(n)))))
 
