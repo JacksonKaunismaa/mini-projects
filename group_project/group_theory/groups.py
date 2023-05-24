@@ -1,7 +1,6 @@
 from collections import defaultdict, deque
 from typing import Union
 from itertools import islice, repeat
-from . import operations
 from . import permutation
 
 def sliding_window(iterable, n):  # standard itertools recipe
@@ -55,6 +54,9 @@ class Term():  # a single instance of something like "r^3", r is the sym, 3 is t
             return Expression([self], self.group)._mul(other)
         else:
             raise NotImplementedError(f"Don't know how to multiply Term * {type(other)}")
+        
+    def copy(self):
+        return Term(self.sym, self.exp, self.group)
         
     # frontend of multiplication
     def __mul__(self, other: Union["Expression", "Term"]) -> Union["Expression", "Term"]:
@@ -125,16 +127,22 @@ class Expression():
         if self.group.verbose:
             print(*args, **kwargs)
 
-    def simplify(self, max_iters=100) -> "Expression":
+    def simplify(self, max_iters=200) -> "Expression":
         updated = True  # if we've applied a rule or not in the given iteration
         n = 0  # check total iterations so far
         self.tprint("doing the printing?")
+        starting = self.copy()  # use this to compare against for simplify_cache
+
         while updated and n < max_iters:
             n += 1
             self.tprint("curr expr is", self)
             updated = False
 
             self = self._filter_identity()  # first step of simplificiation is eliminating identities
+
+            if self in self.group.simplify_cache:  # try exiting early
+                self = self.group.simplify_cache[self].copy()
+                break
 
             for window_size in sorted(self.group.general_rules.keys(), reverse=True):  # check all possible window-sizes we have rules for
                 if len(self) < window_size:
@@ -151,10 +159,25 @@ class Expression():
                             self.tprint("\t\twindow matches, proceeding with replacement...")
                             updated = True
                             self.tprint("\t\tbefore replacing, new_expr is now", type(new_expr), new_expr)
+                            
                             # the result of applying the rule.
                             # filter identity to save a bit of compute (calculating translation doesn't filter for it
                             # ie. window[0]/pattern[0] * result * window[-1]/pattern[-1]
-                            translation = result._concat([window[0]._truediv(pattern[0])], [window[-1]._truediv(pattern[-1])])
+
+                            if window_size == 2 and len(result) == 2:
+                                # very specific optimization for special type of rules
+                                # based on the idea that if `s r = r^k s`, then `s^m r^l = r^(l*k^m) s^m`
+                                left_exponent = window[0].exp  # m 
+                                right_exponent = window[1].exp  # l
+                                result_exp = result[0].exp  # k
+                                # do modular exponentiation for a speed-up
+                                new_exp = right_exponent*pow(result_exp, left_exponent, self.group.singleton_rules.get(result[0].sym))
+                                translation = Expression([Term(result[0].sym, new_exp, self.group),
+                                                          Term(result[1].sym, left_exponent, self.group)], self.group)
+                            elif window_size > 1:
+                                translation = result._concat([window[0]._truediv(pattern[0])], [window[-1]._truediv(pattern[-1])])
+                            else:  # window_size == 1
+                                translation = result._concat([], [window[-1]._truediv(pattern[-1])])
                             
                             self.tprint("\t\twill be adding", translation)
 
@@ -184,6 +207,7 @@ class Expression():
                 self.tprint("end_cycle new_expr is now", new_expr)
                 self = new_expr
         self.tprint("n is", n, max_iters)
+        self.group.simplify_cache[starting] = self
         return self
 
     def _combine_like_terms(self, n: int) -> "Expression":
@@ -234,9 +258,12 @@ class Expression():
         if isinstance(right, list):
             right = Expression(right, self.group)
         return Expression(left.expr + self.expr + right.expr, self.group)._filter_identity()
+    
+    def copy(self):
+        return Expression([t.copy() for t in self.expr], self.group)
 
     # for doing multiply in a simplify operatino so that we don't infinitely recurse
-    def _mul(self, other) -> "Expression": # for Expression * {Expression, Term}
+    def _mul(self, other) -> "Expression": # for Expression * {Expression, Term}        
         if isinstance(other, Expression):
             other_expr = other.expr
         elif isinstance(other, list):
@@ -247,9 +274,10 @@ class Expression():
             raise NotImplementedError(f"Don't know how to multiply Expression * {type(other)}")
         new_expr = Expression(self.expr + other_expr, self.group)
         return new_expr._combine_like_terms(len(self))
+
     
     # frontend of multiplication, so that simplification is done automatically
-    def __mul__(self, other):
+    def __mul__(self, other):  # Expression * {Expression, Term}
         if isinstance(other, Expression) or isinstance(other, Term):
             return self._mul(other).simplify()
         else:
@@ -294,6 +322,7 @@ class Group(set):  # includes both the elements of the Group and the rules of th
         self.singleton_rules = {}
         self.general_rules = defaultdict(list)
         self.symbols = set()
+        self.simplify_cache = {}
         self.verbose = verbose
 
         if rules:
@@ -330,11 +359,11 @@ class Group(set):  # includes both the elements of the Group and the rules of th
         visited = self.subgroup()
         while len(frontier) > 0:  # BFS
             start = frontier.pop()
-            print("checking elem", start)
+            #print("checking elem", start)
             for elem in exprs:
                 next = start*elem
                 if next not in visited:
-                    print("found new node", next)
+                    #print("found new node", next)
                     frontier.add(next)
                     visited.add(next)
                     #yield next  # so that we can do infinite groups as well
@@ -359,7 +388,7 @@ class Group(set):  # includes both the elements of the Group and the rules of th
     
     def subgroup(self, *elems):  # create an empty subgroup that has the same multiplication rules
         group = Group(*elems)
-        set_these = ["singleton_rules", "general_rules", "n", "symbols", "verbose"]
+        set_these = ["singleton_rules", "general_rules", "n", "symbols", "verbose", "simplify_cache"]
         for var_name in set_these:
             if hasattr(self, var_name):
                 setattr(group, var_name, getattr(self, var_name))

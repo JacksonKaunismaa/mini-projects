@@ -11,6 +11,7 @@ class Permutation():
         #print(cycle_notation,result_notation, notation)
 
         self.n = n
+        self.multiply_cache = {}
         if cycle_notation is not None:
             if not n:
                 self.n = 1+max(max(notation, key=max))  # technically a lower bound on n
