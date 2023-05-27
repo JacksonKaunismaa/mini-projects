@@ -1,7 +1,10 @@
 from collections import defaultdict, deque
 from typing import Union
-from itertools import islice, repeat
+from itertools import islice, repeat, chain
+from collections.abc import Iterable
+
 from . import permutation
+from . import utils
 
 def sliding_window(iterable, n):  # standard itertools recipe
     it = iter(iterable)
@@ -300,7 +303,7 @@ class Expression():
             return NotImplemented
     
     def __pow__(self, other):
-        return Expression(list(repeat(self.expr, other)), self.group)
+        return Expression(list(chain(*repeat(self.expr, other))), self.group).simplify()
 
     def __eq__(self, other):  # need to check len because zip truncates elements
         try:
@@ -328,8 +331,8 @@ class Group(set):  # includes both the elements of the Group and the rules of th
         if rules:
             for rule in rules:
                 pattern, result = rule.split("=")
-                pattern_expr = self.parse(pattern)
-                result_expr = self.parse(result)
+                pattern_expr = self._parse(pattern)
+                result_expr = self._parse(result)
                 
                 self._add_syms(pattern_expr, result_expr)  # so that we can generate the group later
 
@@ -347,13 +350,144 @@ class Group(set):  # includes both the elements of the Group and the rules of th
     def _generate_all(self):  # generate all elements in the group
         elems = self.generate(*self.symbols)
         self |= elems
+        
+    def _same_group_type(self, other: "Group"):  # check if 2 Groups are subgroups of the same group
+        if self.is_perm_group:
+            if not other.is_perm_group:
+                return False
+            return self.n == other.n
+        return self.general_rules == other.general_rules and self.singleton_rules == other.singleton_rules
+        
+    def _identity_term(self): # helper function to return an identity element, should only be called internally
+        return Term(None, None, self)  # clients only use is_identity, and is_identity needs to be implemented everywhere
+    
+    def _identity_expr(self):  # helper function to return an expr, pretty much only used in generate
+        if self.is_perm_group:
+            return permutation.Permutation(None, n=self.n)
+        else:
+            return Expression([self._identity_term()], self)
+    
+    def _identity_group(self):   # helper function return a Group containing only an identity {Expression, Permutation}
+        expr = self._identity_expr()
+        return self.subgroup(expr)
+    
+    def _add_syms(self, *exprs):
+        for expr in exprs:
+            for term in expr:
+                if not term.is_identity:
+                    self.symbols.add(term.sym)
+
+    def _parse(self, equation) -> "Expression":  # turn a written string into an Expression
+        terms = equation.strip().split()
+        start = self._identity_term()
+        for t in terms:
+            if t[0] in IDENTITY_SYMBOLS:
+                next_term = self._identity_term()
+            elif len(t) == 1:
+                next_term = Term(t[0], 1, self)  # 1 is default exponent
+            else:
+                next_term = Term(t[0], int(t[1:]), self)
+            start = start._mul(next_term)
+        if isinstance(start, Term):  # always return an Expression 
+            return Expression([start], self)
+        return start
+    
+    def subgroup(self, *elems):  # create an empty subgroup that has the same multiplication rules
+        group = Group(*elems)
+        set_these = ["singleton_rules", "general_rules", "n", "symbols", "verbose", "simplify_cache"]
+        for var_name in set_these:
+            if hasattr(self, var_name):
+                setattr(group, var_name, getattr(self, var_name))
+        return group
+    
+    def evaluate(self, equation):
+        if isinstance(equation, str):
+            return self._parse(equation).simplify()
+        elif isinstance(equation, list):
+            return [self.evaluate(s) for s in equation]  # => recursive
+        else: # ie. Expression, Permutation, Term
+            return equation
+
+    def copy(self):
+        return self.subgroup(*self)
+    
+    def __iter__(self):
+        if not self.has_elems:
+            print("Warning: you are trying to iterate over an empty group")
+        return super().__iter__()        
+    
+
+    # Properties
+
+
+    @property
+    def is_perm_group(self):
+        return hasattr(self, "n")  # permutation groups have n defined, others don't
+    
+    @property
+    def has_elems(self):
+        return len(self) == 0
+    
+    @property
+    def is_subgroup(self):
+        if not self.has_elems:
+            return False
+        for elem1 in self:
+            for elem2 in self:
+                if elem1/elem2 not in self:
+                    return False
+        return True
+    
+    @property
+    def is_normal(self, subgroup):            
+        if not subgroup.is_subgroup:
+            return False
+        for h in subgroup:
+            for g in self:
+                if g * h / g not in self:
+                    return False
+        return True
+
+
+    # Operations
+
+
+    def __mul__(self, other):  # ie Group * Expression (right cosets)
+        if isinstance(other, Expression) or isinstance(other, permutation.Permutation):
+            new_elems = self.subgroup()
+            for elem in self:
+                new_elems.add(elem * other)
+            return new_elems
+        elif isinstance(other, Group) and self._same_group_type(other):
+            new_elems = self.subgroup()
+            for e1 in self:
+                for e2 in other:
+                    new_elems.add(e1 * e2)
+            return new_elems
+        else:
+            return NotImplemented
+        
+    
+    def __rmul__(self, other): # ie. Expression * Group (left cosets)
+        if isinstance(other, Expression) or isinstance(other, permutation.Permutation):
+            new_elems = self.subgroup()
+            for elem in self:
+                new_elems.add(other * elem)
+            return new_elems
+        else:
+            return NotImplemented
+        
+    
+    def __truediv__(self, other): # ie. Group / {Term, Permutation}
+        return self*other.inv()
+    
 
     def generate(self, *exprs) -> "Group":
         if len(exprs) == 0:
             return self._identity_group()
     
         if isinstance(exprs[0], str):
-            exprs = [self.parse(expr) for expr in exprs]
+            exprs = [self.evaluate(expr) for expr in exprs]
 
         frontier = self.subgroup(*exprs)
         visited = self.subgroup()
@@ -369,73 +503,79 @@ class Group(set):  # includes both the elements of the Group and the rules of th
                     #yield next  # so that we can do infinite groups as well
         return visited
     
-    @property
-    def is_perm_group(self):
-        return hasattr(self, "n")  # permutation groups have n defined, others don't
         
-    def _identity_term(self): # helper function to return an identity element, should only be called internally
-        return Term(None, None, self)  # clients only use is_identity, and is_identity needs to be implemented everywhere
-    
-    def _identity_expr(self):  # helper function to return an expr, pretty much only used in generate
-        if self.is_perm_group:
-            return permutation.Permutation(None, n=self.n)
-        else:
-            return Expression([self._identity_term()], self)
-    
-    def _identity_group(self):   # helper function return a Group containing only an identity {Expression, Permutation}
-        expr = self._identity_expr()
-        return self.subgroup(expr)
-    
-    def subgroup(self, *elems):  # create an empty subgroup that has the same multiplication rules
-        group = Group(*elems)
-        set_these = ["singleton_rules", "general_rules", "n", "symbols", "verbose", "simplify_cache"]
-        for var_name in set_these:
-            if hasattr(self, var_name):
-                setattr(group, var_name, getattr(self, var_name))
-        return group
-    
-    def _add_syms(self, *exprs):
-        for expr in exprs:
-            for term in expr:
-                if not term.is_identity:
-                    self.symbols.add(term.sym)
-
-    def parse(self, equation) -> "Expression":  # turn a written string into an Expression
-        terms = equation.strip().split()
-        start = self._identity_term()
-        for t in terms:
-            if t[0] in IDENTITY_SYMBOLS:
-                next_term = self._identity_term()
-            elif len(t) == 1:
-                next_term = Term(t[0], 1, self)  # 1 is default exponent
+    def centralizer(self, elems):
+        elems = self.evaluate(elems)
+        if not isinstance(elems, Iterable):
+            elems = [elems]
+        commuters = self.subgroup()
+        for candidate in self:
+            for pt in elems:
+                if pt*candidate != candidate*pt:
+                    break
             else:
-                next_term = Term(t[0], int(t[1:]), self)
-            start = start._mul(next_term)
-        if isinstance(start, Term):  # always return an Expression 
-            return Expression([start], self)
-        return start
+                #print(commuters)
+                commuters.add(candidate)
+        return commuters
     
-    def evaluate(self, equation):
-        return self.parse(equation).simplify()
 
-    def copy(self):
-        return self.subgroup(*self)
+    def center(self):
+        return self.centralizer(self)
+    
 
-    def __mul__(self, other):  # ie Group * Term (right cosets)
-        new_elems = self.subgroup()
-        for elem in self:
-            new_elems.add(elem * other)
-        return new_elems
+    def conjugacy_class(self, elem):
+        reachable = []
+        generators = []  # the associated list of elements that generate each coset/element in "reachable"
+        elem = self.evaluate(elem)
+        for other in self:
+            new_elem = other * elem / other
+            #print(other, "generates", new_elem)
+            if new_elem not in reachable:
+                reachable.append(new_elem)
+                generators.append(other)
+            else:
+                idx = reachable.index(new_elem)
+                if utils.simpler_heuristic(other, generators[idx]):
+                    generators[idx] = other
+        return dict(zip(generators, reachable))
     
-    def __rmul__(self, other): # ie. Term * Group (left cosets)
-        try:
-            new_elems = self.subgroup()
-        except AttributeError:
-            print(type(self), type(other))
-            raise
-        for elem in self:
-            new_elems.add(other * elem)
-        return new_elems
     
-    def __truediv__(self, other): # ie. Group / {Term, Permutation}
-        return self*other.inv()
+    def orbit(self, base_elem):
+        base_elem = self.evaluate(base_elem)
+
+        reachable = self.subgroup()
+        elem = base_elem
+        reachable.add(elem)
+        while not elem.is_identity:
+            elem = elem*base_elem
+            reachable.add(elem)
+        return reachable
+
+
+    def normalizer(self, elems): # no need to do .evaluate here, since we .generate anyway
+        if not isinstance(elems, Iterable):
+            elems = self.generate(elems)
+        commuters = self.subgroup()
+        for candidate in self:
+            for elem in elems:
+                if candidate*elem/candidate not in elems:
+                    break
+            else:
+                commuters.add(candidate)
+        return commuters
+    
+
+    def find_cosets(self, coset: "Group", left=True):
+        cosets = {}
+        full_group = self.copy()
+        while len(full_group) > 0:
+            elem = full_group.pop()
+            new_coset = elem * coset
+            if new_coset not in cosets.values():
+                best_representative = elem  # heuristically find the simplest representative
+                for representative in new_coset:
+                    if utils.simpler_heuristic(representative, best_representative):
+                        best_representative = representative
+                cosets[best_representative] = new_coset
+                full_group = full_group - new_coset
+        return cosets

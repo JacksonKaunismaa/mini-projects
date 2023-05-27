@@ -4,6 +4,7 @@ import itertools
 import re
 from . import permutation
 from . import groups
+from tqdm import tqdm
 
 # returns True if term1 is heuristically "simpler" than term2
 def simpler_heuristic(term1, term2):
@@ -42,13 +43,16 @@ def factorize(n):  # from https://codereview.stackexchange.com/questions/121862/
 
 def get_interesting_sizes(n):
     # return a list of exponents that would generate a different subgroup from a single element of order n
-    factors = list(Counter(factorize(n)).items())  # so that order is fixed
-    yield 0  # give the option to not use this particular element
-    for exponents in  itertools.product(*(range(sz) for _,sz in factors)):
-        elem = 1
-        for (fact,_), amt in zip(factors, exponents):
-            elem *= fact**amt
-        yield elem
+    # this only really works for single elements
+    # factors = list(Counter(factorize(n)).items())  # so that order is fixed
+    # yield 0  # give the option to not use this particular element
+    # for exponents in  itertools.product(*(range(sz) for _,sz in factors)):
+    #     elem = 1
+    #     for (fact,_), amt in zip(factors, exponents):
+    #         elem *= fact**amt
+    #     yield elem
+
+    return range(n)  # this is the actual safest
 
 
 def find_subgroups(group):  # only works for finite groups
@@ -66,7 +70,7 @@ def find_subgroups(group):  # only works for finite groups
     # if generators are specified in a different order, they are equivalent to each other as well
     # thus, it makes the most sense to consider subgroup generators as a set() object, but we want them to be
     # hashable as well, so make it a frozenset
-    for generator_terms in itertools.product(generator_iter, repeat=len(generators)): 
+    for generator_terms in tqdm(itertools.product(generator_iter, repeat=len(generators))): 
         # inner comprehension is multiplying together generators of the full group to get one of the generators for the subgroup
         subgroup_generators = frozenset(group.parse(' '.join(f"{elem}{amt}" for (elem,_),amt in zip(generators, generator_term)))
                                         for generator_term in generator_terms)
@@ -79,96 +83,6 @@ def find_subgroups(group):  # only works for finite groups
                 subgroups[subgroup_generators] = new_subgroup
     return subgroups
 
-
-def conjugacy_class(elem, all_elems):
-    reachable = []
-    generators = []  # the associated list of elements that generate each coset/element in "reachable"
-    for other in all_elems:
-        new_elem = other * elem / other
-        #print(other, "generates", new_elem)
-        if new_elem not in reachable:
-            reachable.append(new_elem)
-            generators.append(other)
-        else:
-            idx = reachable.index(new_elem)
-            if simpler_heuristic(other, generators[idx]):
-                generators[idx] = other
-    return dict(zip(generators, reachable))
-
-
-def orbit(base_elem):
-    reachable = base_elem.group.subgroup()
-    elem = base_elem
-    reachable.add(elem)
-    while not elem.is_identity:
-        elem = elem*base_elem
-        reachable.add(elem)
-    return reachable
-
-
-def centralizer(elems, all_elems):
-    if not isinstance(elems, Iterable):
-        elems = [elems]
-    commuters = all_elems.subgroup()
-    for candidate in all_elems:
-        for pt in elems:
-            if pt*candidate != candidate*pt:
-                break
-        else:
-            #print(commuters)
-            commuters.add(candidate)
-    return commuters
-
-
-def normalizer(elems, all_elems):
-    if not isinstance(elems, Iterable):
-        elems = all_elems.generate(elems)
-    #all_perms = #get_all_permutations(max(elems, key=lambda x: x.n).n)
-    commuters = all_elems.subgroup()
-    for candidate in all_elems:
-        for elem in elems:
-            if candidate*elem/candidate not in elems:
-                break
-        else:
-            commuters.add(candidate)
-    return commuters
-    
-
-def find_cosets(coset: groups.Group, full_group: groups.Group, left=True) -> list[groups.Group]:
-    cosets = {}
-    full_group = full_group.copy()
-    while len(full_group) > 0:
-        elem = full_group.pop()
-        new_coset = elem * coset
-        if new_coset not in cosets.values():
-            best_representative = elem  # heuristically find the simplest representative
-            for representative in new_coset:
-                if simpler_heuristic(representative, best_representative):
-                    best_representative = representative
-            cosets[best_representative] = new_coset
-            full_group = full_group - new_coset
-    return cosets
-
-
-def is_subgroup(elems: groups.Group):
-    for elem1 in elems:
-        for elem2 in elems:
-            if elem1/elem2 not in elems:
-                return False
-    return True
-
-def is_normal(elems: groups.Group, all_elems: groups.Group):
-    if not is_subgroup(elems):
-        return False
-    for h in elems:
-        for g in all_elems:
-            if g * h / g not in elems:
-                return False
-    return True
-
-
-def center(all_elems):
-    return centralizer(all_elems)
 
 
 def _default_groups(group_name, n):      # some definitions for common finite groups
