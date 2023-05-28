@@ -1,20 +1,10 @@
-from collections import defaultdict, deque
+from collections import defaultdict
 from typing import Union
-from itertools import islice, repeat, chain
+from itertools import repeat, chain
 from collections.abc import Iterable
 
 from . import permutation
 from . import utils
-
-def sliding_window(iterable, n):  # standard itertools recipe
-    it = iter(iterable)
-    window = deque(islice(it, n), maxlen=n)  # maxlen => the first element of the window
-    if len(window) == n:  # will be removed when we do the append operation
-        yield tuple(window)
-    for x in it:
-        window.append(x)
-        yield tuple(window)
-
 
 IDENTITY_SYMBOLS = ["e", "1"]
 
@@ -152,7 +142,7 @@ class Expression():
                     continue
                 new_expr = self.group._identity_expr()
 
-                window_iter = sliding_window(self.expr, window_size)  # current window we are looking to apply rules in
+                window_iter = utils.sliding_window(self.expr, window_size)  # current window we are looking to apply rules in
                 last_posn = 0  # track where we've appended up to, so we can append missing ones at the end
                 for window in window_iter:
                     self.tprint("checking window of", window, type(window))
@@ -320,13 +310,14 @@ class Expression():
 
 
 class Group(set):  # includes both the elements of the Group and the rules of the representation
-    def __init__(self, *elems, rules=None, generate=False, verbose=False):
+    def __init__(self, *elems, rules=None, generate=False, name=None ,verbose=False):
         super().__init__(elems)
         self.singleton_rules = {}
         self.general_rules = defaultdict(list)
         self.symbols = set()
         self.simplify_cache = {}
         self.verbose = verbose
+        self.name = name
 
         if rules:
             for rule in rules:
@@ -346,6 +337,8 @@ class Group(set):  # includes both the elements of the Group and the rules of th
 
         if elems and isinstance(elems[0], permutation.Permutation):
             self.n = elems[0].n
+            if not name:
+                self.name = f"perm {self.n}"
 
     def _generate_all(self):  # generate all elements in the group
         elems = self.generate(*self.symbols)
@@ -394,7 +387,7 @@ class Group(set):  # includes both the elements of the Group and the rules of th
     
     def subgroup(self, *elems):  # create an empty subgroup that has the same multiplication rules
         group = Group(*elems)
-        set_these = ["singleton_rules", "general_rules", "n", "symbols", "verbose", "simplify_cache"]
+        set_these = ["singleton_rules", "general_rules", "n", "symbols", "verbose", "simplify_cache", "name"]
         for var_name in set_these:
             if hasattr(self, var_name):
                 setattr(group, var_name, getattr(self, var_name))
@@ -403,7 +396,7 @@ class Group(set):  # includes both the elements of the Group and the rules of th
     def evaluate(self, equation):
         if isinstance(equation, str):
             return self._parse(equation).simplify()
-        elif isinstance(equation, list):
+        elif isinstance(equation, list) or isinstance(equation, tuple):
             return [self.evaluate(s) for s in equation]  # => recursive
         else: # ie. Expression, Permutation, Term
             return equation
@@ -426,7 +419,7 @@ class Group(set):  # includes both the elements of the Group and the rules of th
     
     @property
     def has_elems(self):
-        return len(self) == 0
+        return len(self) > 0
     
     @property
     def is_subgroup(self):
@@ -514,7 +507,6 @@ class Group(set):  # includes both the elements of the Group and the rules of th
                 if pt*candidate != candidate*pt:
                     break
             else:
-                #print(commuters)
                 commuters.add(candidate)
         return commuters
     
@@ -539,7 +531,7 @@ class Group(set):  # includes both the elements of the Group and the rules of th
                     generators[idx] = other
         return dict(zip(generators, reachable))
     
-    
+
     def orbit(self, base_elem):
         base_elem = self.evaluate(base_elem)
 
@@ -570,7 +562,10 @@ class Group(set):  # includes both the elements of the Group and the rules of th
         full_group = self.copy()
         while len(full_group) > 0:
             elem = full_group.pop()
-            new_coset = elem * coset
+            if left:
+                new_coset = elem * coset
+            else:
+                new_coset = coset * elem
             if new_coset not in cosets.values():
                 best_representative = elem  # heuristically find the simplest representative
                 for representative in new_coset:

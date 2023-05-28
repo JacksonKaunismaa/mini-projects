@@ -1,10 +1,20 @@
-from collections.abc import Iterable
-from collections import Counter
+from collections import deque
 import itertools
 import re
 from . import permutation
 from . import groups
 from tqdm import tqdm
+
+
+def sliding_window(iterable, n):  # standard itertools recipe
+    it = iter(iterable)
+    window = deque(itertools.islice(it, n), maxlen=n)  # maxlen => the first element of the window
+    if len(window) == n:  # will be removed when we do the append operation
+        yield tuple(window)
+    for x in it:
+        window.append(x)
+        yield tuple(window)
+
 
 # returns True if term1 is heuristically "simpler" than term2
 def simpler_heuristic(term1, term2):
@@ -84,7 +94,6 @@ def find_subgroups(group):  # only works for finite groups
     return subgroups
 
 
-
 def _default_groups(group_name, n):      # some definitions for common finite groups
     if group_name == "quaternion":
         group_name = "dicyclic"
@@ -109,7 +118,7 @@ def _default_groups(group_name, n):      # some definitions for common finite gr
                     )
     if group_name in ["dicyclic", "semi_dihedral", "semi_abelian"] and n % 2 != 0:
         raise ValueError(f"n must be divisible by 2 for {group_name} group, it was {n} instead")
-    return groups.Group(rules=rules_d[group_name], generate=False)
+    return groups.Group(rules=rules_d[group_name], generate=False, name=f"{group_name} {n}")
 
 
 def get_group(query):  # would use this in a "interactive" session, but probably useless
@@ -131,3 +140,103 @@ def get_group(query):  # would use this in a "interactive" session, but probably
         return
     size = int(extracted.group(2))
     return _default_groups(group_name, size)
+
+def quicktest():  # some quick and dirty tests
+    # Test parsing and simplification a bit
+    d8_alt = groups.Group(rules=["r8 = e",
+                                "f2 = e",
+                                "r f r = f",
+                                "f r = r7 f"])
+    d8 = get_group("d8")
+
+    test_elems = [("e e e e f e e e e e e e f e e e", "e"),
+                  ("r25 f1 r2 r4 r-17 f1 f2 t12", "r4 t12"),
+                  ("e", "e"),
+                  ("1", "e"),
+                  ("f2 r8 e", "e"),
+                  ("r1", "r"),
+                  ("r2 f", "r2 f"),
+                  ("r3 f e r2 f e f", "r f"),
+                  ("r9 f r r r r", "r5 f"),
+                  ("r r r2 f r3 f f r5 r4 r", "r7 f")]
+    for v in test_elems:
+        parsed_alt = d8_alt._parse(v[0])
+        parsed = d8._parse(v[0])
+        assert parsed == parsed_alt
+
+        answer_alt = d8_alt._parse(v[1])
+        answer = d8._parse(v[1])
+
+        evald = d8_alt.evaluate(v[0])
+        evald_alt = d8.evaluate(v[0])
+        
+        simplified_alt = parsed_alt.simplify()
+        simplified = parsed.simplify()
+
+        assert answer == simplified == answer_alt == simplified_alt == evald == evald_alt
+        assert str(answer) == str(simplified) == str(answer_alt) == str(simplified_alt) == str(evald) == str(evald_alt) == str(v[1])
+
+    # Test multiplication (generated code)
+    gr = get_group('dic 28')
+    t1,t2,ans = gr.evaluate(('r5 s', 'r16', 'r17 s')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r6', 'r26 s', 'r4 s')); assert t1*t2 == ans
+
+    gr = get_group('sa 32')
+    t1,t2,ans = gr.evaluate(('r29 s', 'r8 s', 'r5')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r9 s', 'r31', 'r24 s')); assert t1*t2 == ans
+
+    gr = get_group('sd 64')
+    t1,t2,ans = gr.evaluate(('r33 s', 'r44', 'r53 s')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r51 s', 'r2 s', 'r49')); assert t1*t2 == ans
+
+    gr = get_group('dih 31')
+    t1,t2,ans = gr.evaluate(('r20 f', 'r11 f', 'r9')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r8 f', 'r7', 'r f')); assert t1*t2 == ans
+
+    gr = get_group('cyc 29')
+    t1,t2,ans = gr.evaluate(('r12', 'r3', 'r15')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r20', 'r2', 'r22')); assert t1*t2 == ans
+
+    gr = get_group('abelian 14')
+    t1,t2,ans = gr.evaluate(('r8', 'r7 s', 'r s')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r13 s', 'r4 s', 'r3')); assert t1*t2 == ans
+
+    gr = get_group('quat 32')
+    t1,t2,ans = gr.evaluate(('r10 s', 'r8', 'r2 s')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r15 s', 'r7 s', 'r24')); assert t1*t2 == ans
+
+
+
+
+# Test code generators
+
+def rand_expr(group: groups.Group):
+    import random
+    expr_str = ""
+    for sym in group.symbols:
+        expr_str += f"{sym}{random.randint(0,100)} "
+    return group.evaluate(expr_str)
+
+
+def rand_problem(group: groups.Group):
+    t1 = rand_expr(group)
+    t2 = rand_expr(group)
+    return (str(t1), str(t2), str(t1*t2))
+
+
+def multiplication_problem_template(group_name, problems):
+    problem_text = [f"t1,t2,ans = gr.evaluate({problem}); assert t1*t2 == ans" for problem in problems]
+    return "\n".join([f"gr = get_group('{group_name}')"] + problem_text)
+
+
+def generate_problems():  # code generator for tests
+    group_names = ["dic 28", "sa 32", "sd 64", "dih 31", "cyc 29", "abelian 14", "quat 32"]
+    group_selection = list(map(get_group, group_names))
+    num_problems = 2
+    probs = [[rand_problem(gr) for _ in range(num_problems)] for gr in group_selection]
+    print("# Test multiplication (generated code)")
+    for group_name,prob in zip(group_names, probs):
+        print(multiplication_problem_template(group_name, prob))
+        print()
+
+
