@@ -93,11 +93,11 @@ def find_subgroups(group):  # only works for finite groups
                 subgroups[subgroup_generators] = new_subgroup
     return subgroups
 
-
 def _default_groups(group_name, n):      # some definitions for common finite groups
     if group_name == "quaternion":
         group_name = "dicyclic"
         # n //= 2  # use the group explorer and video notation (different from notation in the slides)
+    # symbolic groups definition
     rules_d =  dict(cyclic=[f"r{n} = e"],
                     dihedral=[f"r{n} = e",
                               f"f2 = e",
@@ -116,9 +116,12 @@ def _default_groups(group_name, n):      # some definitions for common finite gr
                              f"s2 = e",
                              f"s r = r s"],
                     )
-    if group_name in ["dicyclic", "semi_dihedral", "semi_abelian"] and n % 2 != 0:
-        raise ValueError(f"n must be divisible by 2 for {group_name} group, it was {n} instead")
-    return groups.Group(rules=rules_d[group_name], generate=False, name=f"{group_name} {n}")
+    if group_name in ["symmetric", "alternating"]:  # use different settings for permutation groups since they are quite large
+        return groups.Group(n=n, name=f"{group_name} {n}")  # and also have no symbolic rules
+    else:
+        if group_name in ["dicyclic", "semi_dihedral", "semi_abelian"] and n % 2 != 0:
+            raise ValueError(f"n must be divisible by 2 for {group_name} group, it was {n} instead")
+        return groups.Group(rules=rules_d[group_name], generate=True, name=f"{group_name} {n}")
 
 
 def get_group(query):  # would use this in a "interactive" session, but probably useless
@@ -128,8 +131,10 @@ def get_group(query):  # would use this in a "interactive" session, but probably
                 (["dic", "dicyclic"], "dicyclic"),
                 (["semi-dihedral", "sd", "semi_dihedral"], "semi_dihedral"),
                 (["semi-abelian", "sa", "semi_abelian"], "semi_abelian"),
-                (["abelian", "a", "ab"], "abelian"),
-                (["quaternion", "quat", "q"], "quaternion")]
+                (["abelian", "ab"], "abelian"),
+                (["quaternion", "quat", "q"], "quaternion"),
+                (["perm", "permutation", "sym", "symmetric", "s"], "symmetric"),
+                (["alt", "alternating", "a"], "alternating")]
     group_name = extracted.group(1).strip()
     for (alt_names, name) in mappings:
         if group_name in alt_names:
@@ -205,6 +210,13 @@ def quicktest():  # some quick and dirty tests
     t1,t2,ans = gr.evaluate(('r10 s', 'r8', 'r2 s')); assert t1*t2 == ans
     t1,t2,ans = gr.evaluate(('r15 s', 'r7 s', 'r24')); assert t1*t2 == ans
 
+    gr = get_group('sym 8')
+    t1,t2,ans = gr.evaluate(('(1 4 7)(2 6 8 5 3)', '(1 7 2)(3)(4 5)(6 8)', '(1 5 3)(2 8 4)')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('(1 8 2 3 4)(5 7)(6)()', '(1 5 2 6)(3 8 4 7)', '(1 4 5 3 7 2 8 6)')); assert t1*t2 == ans
+
+    gr = get_group('alt 8')
+    t1,t2,ans = gr.evaluate(('(1 2)(3 7 8 4 6 5)', '(1 7 8 6 5 4 3 2)', '(2 7 6 4 5)(3 8)')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('(1 7 6 3 4 2)(5)(8)()', '(1 3)(2)(4 6 5 8)(7)()', '(1 7 5 8 4 2 3 6)')); assert t1*t2 == ans
 
 
 
@@ -212,10 +224,15 @@ def quicktest():  # some quick and dirty tests
 
 def rand_expr(group: groups.Group):
     import random
-    expr_str = ""
-    for sym in group.symbols:
-        expr_str += f"{sym}{random.randint(0,100)} "
-    return group.evaluate(expr_str)
+    if group.is_perm_group:
+        res = list(range(group.n))
+        random.shuffle(res)
+        return permutation.Permutation(res, group)
+    else:
+        expr_str = ""
+        for sym in group.symbols:
+            expr_str += f"{sym}{random.randint(0,100)} "
+        return group.evaluate(expr_str)
 
 
 def rand_problem(group: groups.Group):
@@ -230,7 +247,10 @@ def multiplication_problem_template(group_name, problems):
 
 
 def generate_problems():  # code generator for tests
-    group_names = ["dic 28", "sa 32", "sd 64", "dih 31", "cyc 29", "abelian 14", "quat 32"]
+    group_names = ["dic 28", "sa 32", "sd 64", "dih 31", "cyc 29", "abelian 14", "quat 32", "sym 8", "alt 8"]
+    for group_name in group_names:
+        print(group_name)
+        get_group(group_name)
     group_selection = list(map(get_group, group_names))
     num_problems = 2
     probs = [[rand_problem(gr) for _ in range(num_problems)] for gr in group_selection]

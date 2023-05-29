@@ -1,25 +1,26 @@
-import itertools
 from . import groups
 
 # a Permutation should essentially be equivalent to an Expression (though in some sense it also only ever has a single Term)
 
 class Permutation():
-    def __init__(self, cycle_notation=None, result_notation=None, n=None):
-        assert (cycle_notation is None) ^ (result_notation is None)
-        notation = cycle_notation if cycle_notation is not None else result_notation
+    def __init__(self, notation, group: groups.Group):
+        # notation must be one of cycle notation or result notation
+        # cycle notation is identified as a list[list[int]], result notation is list[int]
+        self.group = group
 
-        #print(cycle_notation,result_notation, notation)
+        notation_type = "cycle"
+        if notation and isinstance(notation[0], int):
+            notation_type = "result"
 
-        self.n = n
         self.multiply_cache = {}
-        if cycle_notation is not None:
-            if not n:
-                self.n = 1+max(max(notation, key=max))  # technically a lower bound on n
+        if notation_type == "cycle":
+            # if not group.n:
+            #     self.n = 1+max(max(notation, key=max))  # technically a lower bound on n
             self.cycle = notation
         else:
-            self.n = max(notation)+1
+            # self.n = max(notation)+1
             shifted_notation = notation
-            remain = set(range(self.n))
+            remain = set(range(self.group.n))
             curr_term = []
             self.cycle = []
             start_new = True  # [2, 5, 3, 1, 4]
@@ -44,23 +45,24 @@ class Permutation():
             self.cycle.append(curr_term.copy())
             #print(self.cycle)
 
-        self.simplify()
+        #self.simplify()
+
+    @classmethod
+    def _parse(self, equation: str, group: groups.Group) -> "Permutation":
+        cycles = equation.split("(")
+        cycles = [x.strip("() ") for x in cycles if x]
+        cycles = [[int(c)-1 for c in x.split(" ") if c] for x in cycles]
+        return Permutation(cycles, group)
 
     @property
     def is_identity(self):
         return not self.cycle
-    
-    @property
-    def group(self):
-        group = groups.Group()  # no rules to derive, so just create an empty one
-        group.n = self.n  # => calling .group.subgroup() is redundant on a Permutation, but it keeps the same API
-        return group   # so its fine
 
     @property
     def cycle_type(self):
         cycle_lens = [len(x) for x in self.cycle]
         num_cycles = []
-        for i in range(self.n):  # the 1's count will likely be wrong
+        for i in range(self.group.n):  # the 1's count will likely be wrong
             num_cycles.append(cycle_lens.count(i+1))
         return num_cycles
     
@@ -76,9 +78,9 @@ class Permutation():
                             for x in self.cycle])
 
     def simplify(self):
-        #print(self.n, "n found")
+        # print(self, self.group.name)
         #print("cycle begins as", self.cycle)
-        remain = set(range(self.n))
+        remain = set(range(self.group.n))
         new_cycle = []
         curr_term = []
         start_new = True
@@ -110,19 +112,23 @@ class Permutation():
                 remain.remove(elem)
         #print("simplified cycle", new_cycle)
         new_cycle.append(curr_term.copy())
-        self.cycle = [x for x in new_cycle if len(x) > 1]
+        return self._filter_identity(new_cycle)
+    
+    def _filter_identity(self, cycle=None):
+        if cycle is None:
+            cycle = self.cycle
+        return Permutation([x for x in cycle if len(x) > 1], self.group)
 
     def inv(self):
-        return Permutation(cycle_notation=list(reversed([list(reversed(x)) for x in self.cycle])), n=self.n)
+        return Permutation(list(reversed([list(reversed(x)) for x in self.cycle])), self.group)
 
     def __mul__(self, other):  # for Permutation * Permutation
         if isinstance(other, Permutation):
             #print(other, "hey", type(other), other, self, isinstance(other, Permutation))
-            inferred_n = max(self.n, other.n)
+            # inferred_n = max(self.n, other.n)
             cycle = self.cycle + other.cycle
-            return Permutation(cycle_notation=cycle, n=inferred_n)
+            return Permutation(cycle, self.group).simplify()
         else:
-            #print(other, "hoy", type(other), other, self, isinstance(other, Permutation))
             return NotImplemented            
 
     def __hash__(self): 
@@ -136,11 +142,3 @@ class Permutation():
 
     def __eq__(self, other):
         return str(self) == str(other)
-
-
-# the one instance where we don't use the .subgroup() interface to create a new group
-def get_all_permutations(n):
-    return groups.Group(*list(Permutation(result_notation=pt) for pt in itertools.permutations(list(range(n)))))
-
-def get_even_permutations(n):
-    return groups.Group(*list(filter(lambda x: x.parity == 0, get_all_permutations(n))))
