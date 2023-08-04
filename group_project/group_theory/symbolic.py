@@ -1,8 +1,8 @@
-# from . import groups
 from typing import Union
 from itertools import repeat, chain
 
 from . import utils
+import group_theory.groups as groups
 
 IDENTITY_SYMBOLS = ["e", "1"]
 
@@ -27,12 +27,12 @@ class Term():  # a single instance of something like "r^3", r is the sym, 3 is t
     @property
     def is_identity(self):
         return self.sym is None
-    
+
     # LHS takes precendence, for Term * {Term, Expression}, backend multiplication to match the Expression API
     def _mul(self, other) -> Union["Expression", "Term"]:
         if self.is_identity:
             return other
-        
+
         if isinstance(other, Term):  # Term * Term multiplication
             if other.is_identity:  # to avoid NoneType issues
                 return self
@@ -40,18 +40,18 @@ class Term():  # a single instance of something like "r^3", r is the sym, 3 is t
                 return Term(self.sym, self.exp + other.exp, self.group)
             else:
                 return Expression([self, other], self.group)
-        
+
         elif isinstance(other, Expression):  # Term * Expression multiplication
             return Expression([self], self.group)._mul(other)
         else:
             raise NotImplementedError(f"Don't know how to multiply Term * {type(other)}")
-        
+
     def copy(self):
         return Term(self.sym, self.exp, self.group)
-        
+
     # frontend of multiplication
     def __mul__(self, other: Union["Expression", "Term"]) -> Union["Expression", "Term"]:
-        if isinstance(other, (Expression,Term)):
+        if isinstance(other, (Expression, Term)):
             return self._mul(other)
         else:
             return NotImplemented
@@ -62,16 +62,16 @@ class Term():  # a single instance of something like "r^3", r is the sym, 3 is t
         if self.is_identity:
             return "e"
         return f"{self.sym}{self.exp}"
-    
+
     # def __len__(self):  # to be consistent with Expression, but shouldn't ever get called
     #     return 1
-    
+
     def __hash__(self):
         return hash(str(self))
 
     def __eq__(self, other):
         return self.sym == other.sym and self.exp == other.exp
-    
+
     def __ge__(self, other):
         if self.is_identity:
             return other.is_identity
@@ -81,14 +81,14 @@ class Term():  # a single instance of something like "r^3", r is the sym, 3 is t
         if self.is_identity:
             return self
         return Term(self.sym, -self.exp, self.group)
-    
+
     def __pow__(self, other):
         return Term(self.sym, self.exp*other).simplify()
 
     # backend of division (no simplify step)
     def _truediv(self, other):
         return self._mul(other.inv())
-    
+
     # frontend division (yes simplify step)
     def __truediv__(self, other):
         if isinstance(other, (Expression,Term)):
@@ -104,7 +104,7 @@ class Expression():
         self.expr = expr
         if not self.expr:
             self.expr = [group._identity_term()]  # allowing empty expresions makes things buggy
-        
+
     @classmethod
     def _parse(self, equation: "str", group) -> "Expression":
         terms = equation.strip().split()
@@ -117,7 +117,7 @@ class Expression():
             else:
                 next_term = Term(t[0], int(t[1:]), group)
             start = start._mul(next_term)
-        if isinstance(start, Term):  # always return an Expression 
+        if isinstance(start, Term):  # always return an Expression
             return Expression([start], group)
         return start
 
@@ -144,8 +144,7 @@ class Expression():
             n += 1
             self.tprint("curr expr is", simplified)
             updated = False
-
-            simplified = simplified._filter_identity()  # first step of simplificiation is eliminating identities
+            # simplified = simplified._filter_identity()  # first step of simplificiation is eliminating identities
 
             if simplified in self.group.simplify_cache:  # try exiting early
                 simplified = self.group.simplify_cache[simplified].copy()
@@ -166,7 +165,7 @@ class Expression():
                             self.tprint("\t\twindow matches, proceeding with replacement...")
                             updated = True
                             self.tprint("\t\tbefore replacing, new_expr is now", type(new_expr), new_expr)
-                            
+
                             # the result of applying the rule.
                             # filter identity to save a bit of compute (calculating translation doesn't filter for it
                             # ie. window[0]/pattern[0] * result * window[-1]/pattern[-1]
@@ -174,7 +173,7 @@ class Expression():
                             if window_size == 2 and len(result) == 2:
                                 # very specific optimization for special type of rules
                                 # based on the idea that if `s r = r^k s`, then `s^m r^l = r^(l*k^m) s^m`
-                                left_exponent = window[0].exp  # m 
+                                left_exponent = window[0].exp  # m
                                 right_exponent = window[1].exp  # l
                                 result_exp = result[0].exp  # k
                                 # do modular exponentiation for a speed-up
@@ -185,7 +184,7 @@ class Expression():
                                 translation = result._concat([window[0]._truediv(pattern[0])], [window[-1]._truediv(pattern[-1])])
                             else:  # window_size == 1
                                 translation = result._concat([], [window[-1]._truediv(pattern[-1])])
-                            
+
                             self.tprint("\t\twill be adding", translation)
 
                             new_expr = new_expr._mul(translation)
@@ -229,7 +228,7 @@ class Expression():
             curr_term = [curr_term]
         curr_term = self._filter_identity(curr_term)
         new_expr = curr_term._concat(self.expr[:n-i-1], self.expr[n+i+1:]) # self.expr[:n-i-1] * curr_term *  self.expr[n+i+1:]
-        
+
         if isinstance(new_expr, Expression):
             return new_expr
         self.expr = new_expr  # can modify in-place here since only used via __mul__, which creates a new Expression anyway
@@ -243,7 +242,7 @@ class Expression():
         else:
             expr_terms = expr
         return Expression(list(filter(lambda x: not x.is_identity, expr_terms)), self.group)
-    
+
     @property
     def is_identity(self):
         return all([x.is_identity for x in self.expr])
@@ -258,19 +257,19 @@ class Expression():
     # isn't called. Used to avoid infinite loops, but probably shouldn't be used by clients. Should only use
     # when you know the combining like terms won't do anything
     # for multiplying {list,Expression} * Expression * {list, Expression}
-    def _concat(self, left: Union[list, "Expression"], 
-                right: Union[list, "Expression"]) -> "Expression": 
+    def _concat(self, left: Union[list, "Expression"],
+                right: Union[list, "Expression"]) -> "Expression":
         if isinstance(left, list):
             left = Expression(left, self.group)
         if isinstance(right, list):
             right = Expression(right, self.group)
         return Expression(left.expr + self.expr + right.expr, self.group)._filter_identity()
-    
+
     def copy(self):
         return Expression([t.copy() for t in self.expr], self.group)
 
     # for doing multiply in a simplify operatino so that we don't infinitely recurse
-    def _mul(self, other) -> "Expression": # for Expression * {Expression, Term}        
+    def _mul(self, other) -> "Expression": # for Expression * {Expression, Term}
         if isinstance(other, Expression):
             other_expr = other.expr
         elif isinstance(other, list):
@@ -282,14 +281,14 @@ class Expression():
         new_expr = Expression(self.expr + other_expr, self.group)
         return new_expr._combine_like_terms(len(self))
 
-    
+
     # frontend of multiplication, so that simplification is done automatically
     def __mul__(self, other):  # Expression * {Expression, Term}
         if isinstance(other, (Expression,Term)):
             return self._mul(other).simplify()
         else:
             return NotImplemented
-    
+
     def inv(self):
         if self.is_identity:
             return self
@@ -298,14 +297,14 @@ class Expression():
     # backend of division (no simplify step)
     def _truediv(self, other):
         return self._mul(other.inv())
-    
+
     # frontend division (with simplify step)
     def __truediv__(self, other):
         if isinstance(other, (Term,Expression)):
             return self._mul(other.inv()).simplify()
         else:
             return NotImplemented
-    
+
     def __pow__(self, other):
         return Expression(list(chain(*repeat(self.expr, other))), self.group).simplify()
 
@@ -318,6 +317,6 @@ class Expression():
 
     def __repr__(self):
         return " ".join([str(t) for t in self.expr])
-    
+
     def __hash__(self):
         return hash(str(self))

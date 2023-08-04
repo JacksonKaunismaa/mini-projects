@@ -1,9 +1,11 @@
 from collections import deque
 import itertools
 import re
+from tqdm import tqdm
+
 from . import permutation
 from . import groups
-from tqdm import tqdm
+from . import symbolic
 
 
 def sliding_window(iterable, n):  # standard itertools recipe
@@ -21,12 +23,12 @@ def simpler_heuristic(term1, term2):
     if term1.is_identity or term2.is_identity:  # identity is simplest, do this to avoid NoneType issues
         return term1.is_identity
 
-    if isinstance(term1, groups.Expression):
+    if isinstance(term1, symbolic.Expression):
         if len(term1) < len(term2):  # shorter Expressions are better
             return True
         if sum(x.exp for x in term1) < sum(x.exp for x in term2): # smaller exponents are better
             return True
-    elif isinstance(term1, groups.Term):
+    elif isinstance(term1, symbolic.Term):
         if term1.exp < term2.exp: # smaller exponents are better
             return True
     elif isinstance(term1, permutation.Permutation):
@@ -217,6 +219,7 @@ def quicktest():  # some quick and dirty tests
     gr = get_group('alt 8')
     t1,t2,ans = gr.evaluate(('(1 2)(3 7 8 4 6 5)', '(1 7 8 6 5 4 3 2)', '(2 7 6 4 5)(3 8)')); assert t1*t2 == ans
     t1,t2,ans = gr.evaluate(('(1 7 6 3 4 2)(5)(8)()', '(1 3)(2)(4 6 5 8)(7)()', '(1 7 5 8 4 2 3 6)')); assert t1*t2 == ans
+    print("passed all tests")
 
 
 

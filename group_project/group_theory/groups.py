@@ -2,8 +2,8 @@ from collections import defaultdict
 from collections.abc import Iterable
 import itertools
 
-from . import symbolic
 from . import permutation
+from . import symbolic
 from . import utils
 
 
@@ -129,12 +129,16 @@ class Group(set):  # includes both the elements of the Group and the rules of th
                     return False
         return True
     
-    def is_normal(self, subgroup):            
+    def is_normal(self, subgroup, verbose=False):            
         if not subgroup.is_subgroup:
+            if verbose:
+                print("not even a subgroup")
             return False
         for h in subgroup:
             for g in self:
-                if g * h / g not in self:
+                if g * h / g not in subgroup:
+                    if verbose:
+                        print(f"group_elem={g}, subgroup_elem={h} generates {g*h/g} not in subgroup")
                     return False
         return True
 
@@ -175,7 +179,7 @@ class Group(set):  # includes both the elements of the Group and the rules of th
             if not self.is_normal(other):
                 raise ValueError("Attempting to quotient by a non-normal subgroup")
             cosets = self.find_cosets(other)
-            return self.subgroup(*cosets.keys())  # will return the representatives only, not the full coset elements
+            return cosets
         
         elif isinstance(other, (symbolic.Expression, permutation.Permutation)):
             return self*other.inv()
@@ -187,18 +191,25 @@ class Group(set):  # includes both the elements of the Group and the rules of th
         if len(exprs) == 0:
             return self._identity_group()
     
-        if isinstance(exprs[0], str):
-            exprs = [self.evaluate(expr) for expr in exprs]
-
-        frontier = self.subgroup(*exprs)
+        flat_exprs = set()
+        for expr in exprs:
+            if isinstance(expr, str):
+                flat_exprs.add(self.evaluate(expr))
+            elif isinstance(expr, Group):
+                flat_exprs |= expr
+            else:
+                raise ValueError(f"Unknown type '{type(expr)}' in exprs list")
+            
+        frontier = self.subgroup(*flat_exprs)
         visited = self.subgroup()
+        # print("frontier", frontier)
         while len(frontier) > 0:  # BFS
             start = frontier.pop()
-            #print("checking elem", start)
-            for elem in exprs:
+            # print("checking elem", start)
+            for elem in flat_exprs:
                 next = start*elem
                 if next not in visited:
-                    #print("found new node", next)
+                    # print("found new node", next)
                     frontier.add(next)
                     visited.add(next)
                     #yield next  # so that we can do infinite groups as well
@@ -263,6 +274,23 @@ class Group(set):  # includes both the elements of the Group and the rules of th
             else:
                 commuters.add(candidate)
         return commuters
+    
+    def normal_closure(self, elems):  # return smallest normal subgroup that contains `elems`
+        if not isinstance(elems, Iterable):
+            elems = self.generate(elems)
+        expanded = self.subgroup()
+        for g in self:
+            expanded |= g * elems / g
+        # print(expanded, "expanded")
+        return self.generate(expanded)
+    
+    def normal_core(self, elems):  # return largest normal subgroup contained in `elems`
+        if not isinstance(elems, Iterable):
+            elems = self.generate(elems)
+        expanded = self.subgroup(*elems)
+        for g in self:
+            expanded &= g * elems / g
+        return expanded
     
 
     def find_cosets(self, coset: "Group", left=True):

@@ -120,7 +120,7 @@ class Permutation():
         return Permutation([x for x in cycle if len(x) > 1], self.group)
 
     def inv(self):
-        return Permutation(list(reversed([list(reversed(x)) for x in self.cycle])), self.group)
+        return Permutation(list(reversed([list(reversed(x)) for x in self.cycle])), self.group).simplify()
 
     def __mul__(self, other):  # for Permutation * Permutation
         if isinstance(other, Permutation):

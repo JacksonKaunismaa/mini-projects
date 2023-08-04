@@ -23,7 +23,6 @@ IGT_DELAY = 5.0
 kctl = keyboard.Controller()
 #minecraft_stats = "/home/test/.minecraft/spedrun-worlds/saves/*/stats/*.json"
 minecraft_stats = "/home/test/E_Drive/Garbage/multimc/install/bin/instances/1.16.1/.minecraft/saves/*/stats/*.json"
-
 class Window(QWidget):
     def __init__(self):
         QWidget.__init__(self)
@@ -246,8 +245,8 @@ def get_igt(filename):
 lock = th.Event()
 reset_allowed = th.Event()
 h =  keyboard.GlobalHotKeys({
-    "<ctrl>+<alt>+<enter>": on_enter,
-    "<ctrl>+<alt>+<backspace>": on_bslash,
+    "<ctrl>+<alt>+'": on_enter,
+    "<ctrl>+<alt>+=": on_bslash,
     "<ctrl>+<alt>+y": create_world})
 h.start()
 try:
