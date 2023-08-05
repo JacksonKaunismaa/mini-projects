@@ -45,12 +45,17 @@ def simpler_heuristic(term1, term2):
 
 
 def factorize(n):  # from https://codereview.stackexchange.com/questions/121862/fast-number-factorization-in-python
-    for fact in itertools.chain([2], itertools.count(3,2)):
+    # some common primes, should mean we can handle reasonable cases very slightly faster
+    primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97]
+    for fact in itertools.chain(primes, itertools.count(primes[-1],2)):
         if n == 1:
             break
         while n % fact == 0:
             n //= fact
             yield fact
+        if fact**2 > n:  # this means n must be prime
+            yield n
+            break
 
 
 def get_interesting_sizes(n):

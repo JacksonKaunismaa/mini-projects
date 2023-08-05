@@ -1,6 +1,7 @@
 from collections import defaultdict
 from collections.abc import Iterable
 import itertools
+from tqdm import tqdm
 
 from . import permutation
 from . import symbolic
@@ -40,9 +41,9 @@ class Group(set):  # includes both the elements of the Group and the rules of th
     def _generate_all(self):  # generate all elements in the group
         if self.is_perm_group:
             if "symmetric" in self.name:
-                self.update(permutation.Permutation(pt, self) for pt in itertools.permutations(list(range(self.n))))
+                self.update(permutation.Permutation(pt, self).simplify() for pt in itertools.permutations(list(range(self.n))))
             else:
-                new_elems = [permutation.Permutation(pt, self) for pt in itertools.permutations(list(range(self.n)))]
+                new_elems = [permutation.Permutation(pt, self).simplify() for pt in itertools.permutations(list(range(self.n)))]
                 self.update([x for x in new_elems if x.parity == 0])
         else:
             elems = self.generate(*self.symbols)
@@ -102,10 +103,13 @@ class Group(set):  # includes both the elements of the Group and the rules of th
     def copy(self):
         return self.subgroup(*self)
     
-    def __iter__(self):
+    def __iter__(self, track=False):
         if not self.has_elems:
             print("Warning: you are trying to iterate over an empty group")
-        return super().__iter__()        
+        iterator = super().__iter__()
+        if track:
+            return tqdm(iterator)
+        return iterator
     
 
     # Properties
@@ -185,6 +189,12 @@ class Group(set):  # includes both the elements of the Group and the rules of th
             return self*other.inv()
         else:
             return NotImplemented
+        
+    def __and__(self, other):  # make sure to cast to a Group object
+        return self.subgroup(*super().__and__(other))
+    
+    def __or__(self, other):
+        return self.subgroup(*super().__or__(other))
     
 
     def generate(self, *exprs) -> "Group":
@@ -234,21 +244,24 @@ class Group(set):  # includes both the elements of the Group and the rules of th
         return self.centralizer(self)
     
 
-    def conjugacy_class(self, elem):
+    def conjugacy_class(self, elem, paired=False, track=False):
         reachable = []
         generators = []  # the associated list of elements that generate each coset/element in "reachable"
         elem = self.evaluate(elem)
-        for other in self:
+        for other in self.__iter__(track=track):
             new_elem = other * elem / other
             #print(other, "generates", new_elem)
-            if new_elem not in reachable:
+            if new_elem not in reachable:  
                 reachable.append(new_elem)
                 generators.append(other)
-            else:
-                idx = reachable.index(new_elem)
+            elif paired:  # if we want to know what to conjugate with to get each element in the conj_class, 
+                idx = reachable.index(new_elem) # then set paired=True. This bit just picks the 'simplest' such element
                 if utils.simpler_heuristic(other, generators[idx]):
                     generators[idx] = other
-        return dict(zip(generators, reachable))
+        if paired:
+            return dict(zip(generators, reachable))
+        else:
+            return self.subgroup(*reachable)
     
 
     def orbit(self, base_elem):
