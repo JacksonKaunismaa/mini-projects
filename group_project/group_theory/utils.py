@@ -162,7 +162,7 @@ def quicktest():  # some quick and dirty tests
     d8 = get_group("d8")
 
     test_elems = [("e e e e f e e e e e e e f e e e", "e"),
-                  ("r25 f1 r2 r4 r-17 f1 f2 t12", "r4 t12"),
+                  ("r25 f1 r2 r4 r-17 f1 f2 f12", "r4"),
                   ("e", "e"),
                   ("1", "e"),
                   ("f2 r8 e", "e"),

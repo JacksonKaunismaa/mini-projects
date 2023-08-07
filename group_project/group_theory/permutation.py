@@ -1,12 +1,16 @@
 from . import groups
 
+from typing import Union, List
+
 # a Permutation should essentially be equivalent to an Expression (though in some sense it also only ever has a single Term)
 
 class Permutation():
-    def __init__(self, notation, group: groups.Group):
+    def __init__(self, notation: Union[List[int], List[List[int]], str], group: groups.Group):
         # notation must be one of cycle notation or result notation
         # cycle notation is identified as a list[list[int]], result notation is list[int]
         self.group = group
+        if isinstance(notation, str):  # if its a string, parse it into cycle notation first
+            notation = self._parse(notation)
 
         notation_type = "cycle"
         if notation and isinstance(notation[0], int):
@@ -47,12 +51,11 @@ class Permutation():
 
         #self.simplify()
 
-    @classmethod
-    def _parse(self, equation: str, group: groups.Group) -> "Permutation":
+    def _parse(self, equation: str) -> List[List[int]]:
         cycles = equation.split("(")
         cycles = [x.strip("() ") for x in cycles if x]
         cycles = [[int(c)-1 for c in x.split(" ") if c] for x in cycles]
-        return Permutation(cycles, group)
+        return cycles
 
     @property
     def is_identity(self):
@@ -112,7 +115,10 @@ class Permutation():
                 remain.remove(elem)
         #print("simplified cycle", new_cycle)
         new_cycle.append(curr_term.copy())
-        return self._filter_identity(new_cycle)
+        filtered = self._filter_identity(new_cycle)
+        if self.group.quotient_map:
+            return self.group.quotient_map[filtered]  # don't bother checking existence, since that should throw an error anyway
+        return filtered
     
     def _filter_identity(self, cycle=None):
         if cycle is None:

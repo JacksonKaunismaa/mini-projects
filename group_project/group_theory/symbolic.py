@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, List
 from itertools import repeat, chain
 
 from . import utils
@@ -99,28 +99,31 @@ class Term():  # a single instance of something like "r^3", r is the sym, 3 is t
 
 
 class Expression():
-    def __init__(self, expr: list[Term], group):
+    def __init__(self, expr: Union[List[Term], str], group, initial=False):
         self.group = group
+        if isinstance(expr, str):  # parse it if its a string
+            expr = self._parse(expr, initial=initial)
         self.expr = expr
         if not self.expr:
             self.expr = [group._identity_term()]  # allowing empty expresions makes things buggy
 
-    @classmethod
-    def _parse(self, equation: "str", group) -> "Expression":
+    def _parse(self, equation: str, initial: bool) -> List[Term]:
         terms = equation.strip().split()
-        start = group._identity_term()
+        start = self.group._identity_term()
         for t in terms:
             if t[0] in IDENTITY_SYMBOLS:
-                next_term = group._identity_term()
+                next_term = self.group._identity_term()  # initial=True when parsing the group rules themselves, since we don't know
+            elif t[0] not in self.group.symbols and not initial:  # 'symbols' at that point, so we can't check against it
+                raise ValueError(f"Unknown symbol '{t[0]}' while parsing expression of a '{self.group.name}' group."
+                                 f"Possible symbols are '{self.group.symbols}'")
             elif len(t) == 1:
-                next_term = Term(t[0], 1, group)  # 1 is default exponent
+                next_term = Term(t[0], 1, self.group)  # 1 is default exponent
             else:
-                next_term = Term(t[0], int(t[1:]), group)
+                next_term = Term(t[0], int(t[1:]), self.group)
             start = start._mul(next_term)
-        if isinstance(start, Term):  # always return an Expression
-            return Expression([start], group)
-        return start
-
+        if isinstance(start, Term):  # always return List[Term]
+            return [start]
+        return start.expr
 
     def windows_match(self, window, pattern):
         if (window[0] >= pattern[0]) and (window[-1] >= pattern[-1]):
@@ -214,6 +217,8 @@ class Expression():
                 simplified = new_expr
         self.tprint("n is", n, max_iters)
         self.group.simplify_cache[self] = simplified
+        if self.group.quotient_map:
+            return self.group.quotient_map[simplified]  # don't bother checking existence, since that should throw an error anyway
         return simplified
 
     def _combine_like_terms(self, n: int) -> "Expression":

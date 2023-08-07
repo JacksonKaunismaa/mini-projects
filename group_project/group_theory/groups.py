@@ -18,6 +18,7 @@ class Group(set):  # includes both the elements of the Group and the rules of th
         self.verbose = verbose
         self.name = name
         self.n = n
+        self.quotient_map = None   # for quotient groups, how to map the elements to the simplest representative
 
         # if (elems and isinstance(elems[0], permutation.Permutation)):
         #     self.n = elems[0].group.n
@@ -25,8 +26,8 @@ class Group(set):  # includes both the elements of the Group and the rules of th
         if rules:
             for rule in rules:
                 pattern, result = rule.split("=")
-                pattern_expr = self._parse(pattern)
-                result_expr = self._parse(result)
+                pattern_expr = self._parse(pattern, initial=True)
+                result_expr = self._parse(result, initial=True)
                 
                 self._add_syms(pattern_expr, result_expr)  # so that we can generate the group later
 
@@ -78,18 +79,22 @@ class Group(set):  # includes both the elements of the Group and the rules of th
                 if not term.is_identity:
                     self.symbols.add(term.sym)
 
-    def _parse(self, equation):  # helper function for creating new expressions
+    def _parse(self, equation, initial=False):  # helper function for creating new expressions
         if self.is_perm_group:
-            return permutation.Permutation._parse(equation, self)
+            return permutation.Permutation(equation, self)
         else:
-            return symbolic.Expression._parse(equation, self)
+            return symbolic.Expression(equation, self, initial=initial)
     
     def subgroup(self, *elems):  # create an empty subgroup that has the same multiplication rules
         group = Group(*elems)
-        set_these = ["singleton_rules", "general_rules", "n", "symbols", "verbose", "simplify_cache", "name", "n"]
+        set_these = ["singleton_rules", "general_rules", "n", "symbols", 
+                     "verbose", "simplify_cache", "name", "n", "quotient_map"]
         for var_name in set_these:
             if hasattr(self, var_name):
-                setattr(group, var_name, getattr(self, var_name))
+                obj = getattr(self, var_name)
+                if var_name in ['quotient_map'] and obj:
+                    obj = obj.copy()
+                setattr(group, var_name, obj)
         return group
     
     def evaluate(self, equation):
@@ -162,6 +167,12 @@ class Group(set):  # includes both the elements of the Group and the rules of th
                 for e2 in other:
                     new_elems.add(e1 * e2)
             return new_elems
+        elif isinstance(other, str):
+            elem = self.evaluate(other)
+            return self * elem
+        elif isinstance(other, list) and isinstance(other[0], str):
+            elems = self.generate(*other)
+            return self / elems
         else:
             return NotImplemented
         
@@ -172,10 +183,16 @@ class Group(set):  # includes both the elements of the Group and the rules of th
             for elem in self:
                 new_elems.add(other * elem)
             return new_elems
+        elif isinstance(other, str):  # TODO: add List[str] support
+            elem = self.evaluate(other)
+            return elem * self
+        elif isinstance(other, list) and isinstance(other[0], str):
+            elems = self.generate(*other)
+            return elems * self
         else:
             return NotImplemented
-        
     
+
     def __truediv__(self, other): # ie. Group / {Term, Permutation}
         if isinstance(other, Group):
             if not self._same_group_type(other):
@@ -183,10 +200,18 @@ class Group(set):  # includes both the elements of the Group and the rules of th
             if not self.is_normal(other):
                 raise ValueError("Attempting to quotient by a non-normal subgroup")
             cosets = self.find_cosets(other)
-            return cosets
+            # print("cosets", cosets)
+            quotient_map = {x: representative for representative, coset in cosets.items() for x in coset}
+            reprs = cosets.keys()
+            quotient = self.subgroup(*reprs)
+            quotient.quotient_map = quotient_map
+            return quotient
         
         elif isinstance(other, (symbolic.Expression, permutation.Permutation)):
             return self*other.inv()
+        elif isinstance(other, list) and isinstance(other[0], str):
+            elems = self.generate(*other)
+            return self / elems
         else:
             return NotImplemented
         
@@ -260,8 +285,10 @@ class Group(set):  # includes both the elements of the Group and the rules of th
                     generators[idx] = other
         if paired:
             return dict(zip(generators, reachable))
-        else:
+        elif not isinstance(elem, Group):
             return self.subgroup(*reachable)
+        else:
+            return reachable
     
 
     def orbit(self, base_elem):
@@ -277,7 +304,7 @@ class Group(set):  # includes both the elements of the Group and the rules of th
 
 
     def normalizer(self, elems): # no need to do .evaluate here, since we .generate anyway
-        if not isinstance(elems, Iterable):
+        if not isinstance(elems, Group):
             elems = self.generate(elems)
         commuters = self.subgroup()
         for candidate in self:
@@ -323,3 +350,10 @@ class Group(set):  # includes both the elements of the Group and the rules of th
                 cosets[best_representative] = new_coset
                 full_group = full_group - new_coset
         return cosets
+    
+    def commutator(self, track=False):
+        elems = self.subgroup()
+        for x in self.__iter__(track=track):
+            for y in self:
+                elems.add(x * y / x / y)
+        return self.generate(elems)
