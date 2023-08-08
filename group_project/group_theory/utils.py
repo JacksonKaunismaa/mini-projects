@@ -100,7 +100,7 @@ def find_subgroups(group):  # only works for finite groups
                 subgroups[subgroup_generators] = new_subgroup
     return subgroups
 
-def _default_groups(group_name, n):      # some definitions for common finite groups
+def _default_groups(group_name, n, generate): # some definitions for common finite groups
     if group_name == "quaternion":
         group_name = "dicyclic"
         # n //= 2  # use the group explorer and video notation (different from notation in the slides)
@@ -123,15 +123,16 @@ def _default_groups(group_name, n):      # some definitions for common finite gr
                              f"s2 = e",
                              f"s r = r s"],
                     )
+
     if group_name in ["symmetric", "alternating"]:  # use different settings for permutation groups since they are quite large
-        return groups.Group(n=n, name=f"{group_name} {n}")  # and also have no symbolic rules
+        return groups.Group(n=n, generate=generate, name=f"{group_name} {n}")  # and also have no symbolic rules
     else:
         if group_name in ["dicyclic", "semi_dihedral", "semi_abelian"] and n % 2 != 0:
             raise ValueError(f"n must be divisible by 2 for {group_name} group, it was {n} instead")
-        return groups.Group(rules=rules_d[group_name], generate=True, name=f"{group_name} {n}")
+        return groups.Group(rules=rules_d[group_name], generate=generate, name=f"{group_name} {n}")
 
 
-def get_group(query):  # would use this in a "interactive" session, but probably useless
+def get_group(query, generate=None):  # would use this in a "interactive" session, but probably useless
     extracted = re.search(r"([a-zA-Z]+) ?(\d+)", query.lower().strip())
     mappings = [(["d", "dihedral", "dih", "di"], "dihedral"),
                 (["c", "z", "cyclic", "cyc"], "cyclic"),
@@ -151,7 +152,7 @@ def get_group(query):  # would use this in a "interactive" session, but probably
         print(f"Group name {group_name} not recognized")
         return
     size = int(extracted.group(2))
-    return _default_groups(group_name, size)
+    return _default_groups(group_name, size, generate)
 
 def quicktest():  # some quick and dirty tests
     # Test parsing and simplification a bit

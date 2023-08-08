@@ -36,8 +36,11 @@ class Group(set):  # includes both the elements of the Group and the rules of th
                     continue
                 self.general_rules[len(pattern_expr)].append((pattern_expr, result_expr))    # map symbol -> (exponent, replacement)
         
+        if generate is None:
+            generate = not self.is_perm_group  # default is don't generate perm_groups, but generate everything else
         if generate:  # should probably only use this for finite groups
             self._generate_all()  # can't really handle infinite groups yet
+
 
     def _generate_all(self):  # generate all elements in the group
         if self.is_perm_group:
@@ -61,7 +64,7 @@ class Group(set):  # includes both the elements of the Group and the rules of th
         if self.is_perm_group:
             return permutation.Permutation([], self)
         else:
-            return symbolic.Term(None, None, self)  # clients only use is_identity, and is_identity needs to be implemented everywhere
+            return symbolic.Term(None, None)  # clients only use is_identity, and is_identity needs to be implemented everywhere
     
     def _identity_expr(self):  # helper function to return an expr, pretty much only used in generate
         if self.is_perm_group:
@@ -88,7 +91,7 @@ class Group(set):  # includes both the elements of the Group and the rules of th
     def subgroup(self, *elems):  # create an empty subgroup that has the same multiplication rules
         group = Group(*elems)
         set_these = ["singleton_rules", "general_rules", "n", "symbols", 
-                     "verbose", "simplify_cache", "name", "n", "quotient_map"]
+                     "verbose", "simplify_cache", "name", "quotient_map"]
         for var_name in set_these:
             if hasattr(self, var_name):
                 obj = getattr(self, var_name)
@@ -128,18 +131,19 @@ class Group(set):  # includes both the elements of the Group and the rules of th
     def has_elems(self):
         return len(self) > 0
     
-    @property
-    def is_subgroup(self):
+    def is_subgroup(self, verbose=True):
         if not self.has_elems:
             return False
         for elem1 in self:
             for elem2 in self:
                 if elem1/elem2 not in self:
+                    if verbose:
+                        print(f"{elem1=}, {elem2=} generates {elem1/elem2} not in subgroup")
                     return False
         return True
     
     def is_normal(self, subgroup, verbose=False):            
-        if not subgroup.is_subgroup:
+        if not subgroup.is_subgroup(verbose=verbose):
             if verbose:
                 print("not even a subgroup")
             return False
@@ -172,7 +176,7 @@ class Group(set):  # includes both the elements of the Group and the rules of th
             return self * elem
         elif isinstance(other, list) and isinstance(other[0], str):
             elems = self.generate(*other)
-            return self / elems
+            return self * elems
         else:
             return NotImplemented
         
@@ -183,7 +187,7 @@ class Group(set):  # includes both the elements of the Group and the rules of th
             for elem in self:
                 new_elems.add(other * elem)
             return new_elems
-        elif isinstance(other, str):  # TODO: add List[str] support
+        elif isinstance(other, str):
             elem = self.evaluate(other)
             return elem * self
         elif isinstance(other, list) and isinstance(other[0], str):
@@ -204,6 +208,8 @@ class Group(set):  # includes both the elements of the Group and the rules of th
             quotient_map = {x: representative for representative, coset in cosets.items() for x in coset}
             reprs = cosets.keys()
             quotient = self.subgroup(*reprs)
+            for representative in quotient_map.values():
+                representative.group = quotient  # update the group in the map to the new, correct thing
             quotient.quotient_map = quotient_map
             return quotient
         

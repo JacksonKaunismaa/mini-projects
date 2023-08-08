@@ -1,11 +1,12 @@
-from . import groups
+from typing import Union, List, TYPE_CHECKING
 
-from typing import Union, List
+if TYPE_CHECKING:
+    from .groups import Group
 
 # a Permutation should essentially be equivalent to an Expression (though in some sense it also only ever has a single Term)
 
 class Permutation():
-    def __init__(self, notation: Union[List[int], List[List[int]], str], group: groups.Group):
+    def __init__(self, notation: Union[List[int], List[List[int]], str], group: "Group"):
         # notation must be one of cycle notation or result notation
         # cycle notation is identified as a list[list[int]], result notation is list[int]
         self.group = group
@@ -16,7 +17,6 @@ class Permutation():
         if notation and isinstance(notation[0], int):
             notation_type = "result"
 
-        self.multiply_cache = {}
         if notation_type == "cycle":
             # if not group.n:
             #     self.n = 1+max(max(notation, key=max))  # technically a lower bound on n
