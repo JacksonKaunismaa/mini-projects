@@ -2,6 +2,7 @@ from collections import deque
 import itertools
 import re
 from tqdm import tqdm
+import math
 
 from . import permutation
 from . import groups
@@ -127,8 +128,10 @@ def _default_groups(group_name, n, generate): # some definitions for common fini
     if group_name in ["symmetric", "alternating"]:  # use different settings for permutation groups since they are quite large
         return groups.Group(n=n, generate=generate, name=f"{group_name} {n}")  # and also have no symbolic rules
     else:
-        if group_name in ["dicyclic", "semi_dihedral", "semi_abelian"] and n % 2 != 0:
+        if group_name in ["dicyclic"] and n % 2 != 0:
             raise ValueError(f"n must be divisible by 2 for {group_name} group, it was {n} instead")
+        if group_name in ["semi_dihedral", "semi_abelian"] and math.log2(n) != int(math.log2(n)):
+            raise ValueError(f"n must be a power of 2 for {group_name} group, it was {n} instead")
         return groups.Group(rules=rules_d[group_name], generate=generate, name=f"{group_name} {n}")
 
 
