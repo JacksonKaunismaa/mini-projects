@@ -159,7 +159,7 @@ class Group(set):  # includes both the elements of the Group and the rules of th
     # Operations
 
 
-    def __mul__(self, other):  # ie Group * Expression (right cosets)
+    def __mul__(self, other):  # ie Group * [Expression, Group, str, list[str]] (right cosets)
         if isinstance(other, (symbolic.Expression, permutation.Permutation)):
             new_elems = self.subgroup()
             for elem in self:
