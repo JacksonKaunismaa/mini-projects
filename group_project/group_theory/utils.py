@@ -194,40 +194,67 @@ def quicktest():  # some quick and dirty tests
 
     # Test multiplication (generated code)
     gr = get_group('dic 28')
-    t1,t2,ans = gr.evaluate(('r5 s', 'r16', 'r17 s')); assert t1*t2 == ans
-    t1,t2,ans = gr.evaluate(('r6', 'r26 s', 'r4 s')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r11 s', 'e', 'r11 s')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r10 s', 'r5 s', 'r19')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r9 s', 'r17 s', 'r6')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r11 s', 'r12', 'r27 s')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r13', 'r23 s', 'r8 s')); assert t1*t2 == ans
 
     gr = get_group('sa 32')
-    t1,t2,ans = gr.evaluate(('r29 s', 'r8 s', 'r5')); assert t1*t2 == ans
-    t1,t2,ans = gr.evaluate(('r9 s', 'r31', 'r24 s')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r10', 'r11', 'r21')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r19 s', 'r11', 'r14 s')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r24 s', 'r2', 'r26 s')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r16 s', 'r16', 's')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r12 s', 'r5 s', 'r')); assert t1*t2 == ans
 
     gr = get_group('sd 64')
-    t1,t2,ans = gr.evaluate(('r33 s', 'r44', 'r53 s')); assert t1*t2 == ans
-    t1,t2,ans = gr.evaluate(('r51 s', 'r2 s', 'r49')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r17 s', 'r35', 'r14 s')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r29', 'r3', 'r32')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r6 s', 'r36 s', 'r34')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r46', 'r53 s', 'r35 s')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r32', 'r28 s', 'r60 s')); assert t1*t2 == ans
 
     gr = get_group('dih 31')
-    t1,t2,ans = gr.evaluate(('r20 f', 'r11 f', 'r9')); assert t1*t2 == ans
-    t1,t2,ans = gr.evaluate(('r8 f', 'r7', 'r f')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r24 f', 'r28 f', 'r27')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r9 f', 'r5 f', 'r4')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r14', 'r16', 'r30')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r3', 'r25', 'r28')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r24 f', 'r17', 'r7 f')); assert t1*t2 == ans
 
     gr = get_group('cyc 29')
-    t1,t2,ans = gr.evaluate(('r12', 'r3', 'r15')); assert t1*t2 == ans
-    t1,t2,ans = gr.evaluate(('r20', 'r2', 'r22')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r15', 'r2', 'r17')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r11', 'r7', 'r18')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r8', 'r4', 'r12')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r2', 'r4', 'r6')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r12', 'r4', 'r16')); assert t1*t2 == ans
 
     gr = get_group('abelian 14')
-    t1,t2,ans = gr.evaluate(('r8', 'r7 s', 'r s')); assert t1*t2 == ans
-    t1,t2,ans = gr.evaluate(('r13 s', 'r4 s', 'r3')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r4', 's', 'r4 s')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r9', 'r13 s', 'r8 s')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r s', 'r9', 'r10 s')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('e', 'r', 'r')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r11 s', 'r12 s', 'r9')); assert t1*t2 == ans
 
     gr = get_group('quat 32')
-    t1,t2,ans = gr.evaluate(('r10 s', 'r8', 'r2 s')); assert t1*t2 == ans
-    t1,t2,ans = gr.evaluate(('r15 s', 'r7 s', 'r24')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r20', 'r18 s', 'r6 s')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r4 s', 'r5', 'r31 s')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r14', 'r31', 'r13')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r5 s', 'r29 s', 'r24')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('r22', 'r30 s', 'r20 s')); assert t1*t2 == ans
 
     gr = get_group('sym 8')
-    t1,t2,ans = gr.evaluate(('(1 4 7)(2 6 8 5 3)', '(1 7 2)(3)(4 5)(6 8)', '(1 5 3)(2 8 4)')); assert t1*t2 == ans
-    t1,t2,ans = gr.evaluate(('(1 8 2 3 4)(5 7)(6)()', '(1 5 2 6)(3 8 4 7)', '(1 4 5 3 7 2 8 6)')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('(1 8 5 4 3 7 2)(6)()', '(1 6 4 7 5 3)(2)(8)()', '(1 8 3 5 7 2 6 4)')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('(1 2 6 8 3 5 7)(4)()', '(1)(2)(3 4 8 7 6)(5)()', '(1 2 3 5 6 7)(4 8)')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('(1 7 5 6)(2 8 3 4)', '(1 8 6 4)(2)(3 5)(7)()', '(1 7 3)(2 6 8 5 4)')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('(1 3 5 8)(2 6 4 7)', '(1 2)(3 7 8 4 6 5)', '(1 7)(2 5 4 8)')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('(1 6)(2 3 8 4 7)(5)()', '(1 6 7 4 3 5)(2)(8)()', '(1 7 2 5)(3 8)')); assert t1*t2 == ans
 
     gr = get_group('alt 8')
-    t1,t2,ans = gr.evaluate(('(1 2)(3 7 8 4 6 5)', '(1 7 8 6 5 4 3 2)', '(2 7 6 4 5)(3 8)')); assert t1*t2 == ans
-    t1,t2,ans = gr.evaluate(('(1 7 6 3 4 2)(5)(8)()', '(1 3)(2)(4 6 5 8)(7)()', '(1 7 5 8 4 2 3 6)')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('(1 2 8 4)(3)(5)(6 7)', '(1)(2 8 6 7 5 3 4)', '(1 8 2 6 5 3 4)')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('(1 3 7)(2 4 8)(5)(6)()', '(1 5 8 7 4 3)(2 6)', '(2 3 4 7 5 8 6)')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('(1 3 5 4 2 7 8 6)', '(1 2 8 5 4)(3)(6)(7)()', '(1 3 4 8 6 2 7 5)')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('(1 6 8 5 3 4 7)(2)()', '(1 5 4 3 8 7)(2)(6)()', '(1 6 7 5 8 4)')); assert t1*t2 == ans
+    t1,t2,ans = gr.evaluate(('(1 8 3 7 2)(4)(5)(6)()', '(1 3 4 6 8 2)(5 7)', '(1 2 3 5 7)(4 6 8)')); assert t1*t2 == ans
     print("passed all tests")
 
 
@@ -258,13 +285,12 @@ def multiplication_problem_template(group_name, problems):
     return "\n".join([f"gr = get_group('{group_name}')"] + problem_text)
 
 
-def generate_problems():  # code generator for tests
+def generate_problems(num_problems=2):  # code generator for tests
     group_names = ["dic 28", "sa 32", "sd 64", "dih 31", "cyc 29", "abelian 14", "quat 32", "sym 8", "alt 8"]
     for group_name in group_names:
         print(group_name)
         get_group(group_name)
     group_selection = list(map(get_group, group_names))
-    num_problems = 2
     probs = [[rand_problem(gr) for _ in range(num_problems)] for gr in group_selection]
     print("# Test multiplication (generated code)")
     for group_name,prob in zip(group_names, probs):

@@ -245,7 +245,7 @@ def get_igt(filename):
 lock = th.Event()
 reset_allowed = th.Event()
 h =  keyboard.GlobalHotKeys({
-    "<ctrl>+<alt>+'": on_enter,
+    "q": on_enter,
     "<ctrl>+<alt>+=": on_bslash,
     "<ctrl>+<alt>+y": create_world})
 h.start()

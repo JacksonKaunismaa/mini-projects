@@ -1,5 +1,6 @@
 from typing import Union, List, TYPE_CHECKING, Optional
-from itertools import repeat, chain
+from itertools import chain
+# import copy
 
 from . import utils
 if TYPE_CHECKING:
@@ -54,8 +55,8 @@ class Term():  # a single instance of something like "r^3", r is the sym, 3 is t
             print(type(other), "type")
             raise NotImplementedError(f"Don't know how to multiply Term * {type(other)}")
 
-    def copy(self):
-        return Term(self.sym, self.exp, cyclic_rule=self.cyclic_rule)
+    # def copy(self):
+    #     return Term(self.sym, self.exp, cyclic_rule=self.cyclic_rule)
 
     # frontend of multiplication
     def __mul__(self, other: Union["Expression", "Term"]) -> Union["Expression", "Term"]:
@@ -90,8 +91,8 @@ class Term():  # a single instance of something like "r^3", r is the sym, 3 is t
             return self
         return Term(self.sym, -self.exp, cyclic_rule=self.cyclic_rule)
 
-    def __pow__(self, other):
-        return Term(self.sym, self.exp*other, cyclic_rule=self.cyclic_rule).simplify()
+    # def __pow__(self, other):
+    #     return Term(self.sym, self.exp*other, cyclic_rule=self.cyclic_rule).simplify()
 
     # backend of division (no simplify step)
     def _truediv(self, other):
@@ -149,7 +150,7 @@ class Expression():  # a sequence of Term objects,  like `r^2 f`
         updated = True  # if we've applied a rule or not in the given iteration
         n = 0  # check total iterations so far
         # self.tprint("doing the printing?")
-        simplified = self.copy()  # working copy that we will be writing to
+        simplified = self # working copy that we will be writing to
 
         while updated and n < max_iters:
             n += 1
@@ -159,7 +160,7 @@ class Expression():  # a sequence of Term objects,  like `r^2 f`
 
             if simplified in self.group.simplify_cache:  # try exiting early
                 # self.tprint("found in cache", simplified)
-                simplified.expr = self.group.simplify_cache[simplified].copy()
+                simplified.expr = self.group.simplify_cache[simplified]
                 break
 
             for window_size in sorted(self.group.general_rules.keys(), reverse=True):  # check all possible window-sizes we have rules for
@@ -228,9 +229,12 @@ class Expression():  # a sequence of Term objects,  like `r^2 f`
         # self.tprint("n was", n, max_iters)
         # self.tprint(simplified.group, self.group)
         self.group.simplify_cache[self] = simplified.expr
-        if self.group.quotient_map:
-            return self.group.quotient_map[simplified] # don't bother checking existence, since that should throw an error anyway
-        return simplified
+        # technically there should be .copy() on each return statement, but unless the client is doing something like
+        # directly modifying .exp or .sym fields, it won't really have problems, since every "proper" operation will
+        # create new Terms/Expressions as needed and won't mess up the simplify_cache
+        if self.group.quotient_map:  # don't bother checking existence, since that should throw an error anyway
+            return self.group.quotient_map[simplified]#.copy() 
+        return simplified#.copy()
 
     def _combine_like_terms(self, n: int) -> "Expression":
         # if self is abcd * xyz then we should combine like terms starting from the 'gap' between
@@ -287,8 +291,10 @@ class Expression():  # a sequence of Term objects,  like `r^2 f`
             right = Expression(right, self.group)
         return Expression(left.expr + self.expr + right.expr, self.group)._filter_identity()
 
-    def copy(self):
-        return Expression(self.expr.copy(), self.group)
+    # def copy(self):  # need deepcopy since its a list
+    #     # return Expression(copy.deepcopy(self.expr), self.group)
+    #     return Expression(self.expr.copy(), self.group)
+
 
     # for doing multiply in a simplify operatino so that we don't infinitely recurse (backend mul)
     def _mul(self, other) -> "Expression": # for Expression * {Expression, Term}
@@ -328,7 +334,10 @@ class Expression():  # a sequence of Term objects,  like `r^2 f`
             return NotImplemented
 
     def __pow__(self, other):
-        return Expression(list(chain(*repeat(self.expr, other))), self.group).simplify()
+        curr_expr = self.group._identity_expr()
+        for _ in range(other):
+            curr_expr *= self
+        return curr_expr
 
     def __eq__(self, other):  # need to check len because zip truncates elements
         try:
