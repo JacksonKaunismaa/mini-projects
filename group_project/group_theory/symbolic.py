@@ -15,7 +15,7 @@ class Term():  # a single instance of something like "r^3", r is the sym, 3 is t
         # can specify either a Group, which is only used to extract the cyclic_rule, or pass cyclic_rule directly
         self.sym = sym
         self.exp = exp
-        self.cyclic_rule = cyclic_rule 
+        self.cyclic_rule = cyclic_rule
         if group is not None:
             self.cyclic_rule = group.singleton_rules.get(sym, None)  # mostly for efficiency
         self.simplify()
@@ -192,7 +192,7 @@ class Expression():  # a sequence of Term objects,  like `r^2 f`
                                 # do modular exponentiation for a speed-up
                                 new_exp = right_exponent*pow(result_exp, left_exponent, result[0].cyclic_rule) #
                                 translation = Expression([Term(result[0].sym, new_exp, cyclic_rule=result[0].cyclic_rule),
-                                                          Term(result[1].sym, left_exponent, cyclic_rule=result[1].cyclic_rule)], 
+                                                          Term(result[1].sym, left_exponent, cyclic_rule=result[1].cyclic_rule)],
                                                           self.group)
                             elif window_size > 1:
                                 translation = result._concat([window[0]._truediv(pattern[0])], [window[-1]._truediv(pattern[-1])])
