@@ -80,6 +80,14 @@ class Permutation():
             return "".join([f'({" ".join(map(lambda y: str(y+1), x))})'
                             for x in self.cycle])
 
+    def result_notation(self):
+        """Returns the result notation of the permutation."""
+        result = list(range(self.group.n))
+        for cycle in self.cycle:
+            for i in range(len(cycle)):
+                result[cycle[(i+1) % len(cycle)]] = cycle[i]
+        return result
+
     def simplify(self):
         # print(self, self.group.name)
         #print("cycle begins as", self.cycle)
