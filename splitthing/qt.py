@@ -249,7 +249,7 @@ mode_group = parser.add_mutually_exclusive_group()
 # Add the options for the different modes
 mode_group.add_argument("--mc", action="store_true", help="Enable timer and resetting")
 mode_group.add_argument("--reset", action="store_true", help="Enable resetting only")
-mode_group.add_argument("--timer", action="store_true", help="Enable timer only")
+mode_group.add_argument("--timer", action="store_true", default=True, help="Enable timer only")
 
 args = parser.parse_args()
 
